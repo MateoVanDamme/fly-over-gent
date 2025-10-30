@@ -1,0 +1,2 @@
+; Export current drawing to IGES in the same folder
+_.EXPORT "$(DWGPREFIX)$(DWGNAME).iges" IGES ALL
