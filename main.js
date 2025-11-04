@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import Stats from 'three/addons/libs/stats.module.js';
-import { loadSTLTiles } from './tileLoader.js';
+import { loadSTLTiles } from './javascript/tileLoader.js';
 
 let camera, scene, renderer, gridHelper, stats;
 

@@ -66,11 +66,11 @@ export function loadSTLTiles(scene, onProgress, onComplete, onError) {
         depthWrite: true
     });
 
-    // Material for terrain
+    // Material for terrain - same as buildings
     const terrainMaterial = new THREE.MeshPhongMaterial({
-        color: 0xcccccc, // Bright gray
-        specular: 0x050505,
-        shininess: 5,
+        color: 0xffffff,
+        specular: 0x111111,
+        shininess: 200,
         flatShading: true,
         side: THREE.DoubleSide,
         depthTest: true,
@@ -94,10 +94,16 @@ export function loadSTLTiles(scene, onProgress, onComplete, onError) {
                 const box = geometry.boundingBox;
                 const centerX = (box.min.x + box.max.x) / 2;
                 const centerY = (box.min.y + box.max.y) / 2;
-                geometry.translate(-centerX, -centerY, -box.min.z);
+                geometry.translate(-centerX, -centerY, 0);
 
                 // Create mesh
                 const mesh = new THREE.Mesh(geometry, material);
+
+                // Add edge highlighting
+                const edges = new THREE.EdgesGeometry(geometry, 30); // 30 degree threshold
+                const lineMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 1 });
+                const edgeLines = new THREE.LineSegments(edges, lineMaterial);
+                mesh.add(edgeLines);
 
                 // Calculate relative position from origin based on filename coordinates
                 const relativeX = (tile.x - minX);
