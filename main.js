@@ -4,9 +4,12 @@ import Stats from 'three/addons/libs/stats.module.js';
 
 let camera, scene, renderer, gridHelper, stats;
 let loadedCount = 0;
-const totalTiles = 2;
+const totalTiles = 4; // 2 building tiles + 2 terrain tiles
 
 const clock = new THREE.Clock();
+
+// Rendering constants
+const MAX_RENDER_DISTANCE = 4000; // Maximum view distance in meters
 
 // FPS controls
 const playerVelocity = new THREE.Vector3();
@@ -20,7 +23,7 @@ function init() {
     // Scene setup
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x222222);
-    scene.fog = new THREE.Fog(0x222222, 10, 4000);
+    scene.fog = new THREE.Fog(0x222222, 10, MAX_RENDER_DISTANCE);
 
     // Renderer setup
     renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -35,7 +38,7 @@ function init() {
     document.body.appendChild(stats.dom);
 
     // Camera setup
-    camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 10000000);
+    camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, MAX_RENDER_DISTANCE);
     camera.rotation.order = 'YXZ';
     camera.position.set(0, 10, 0);
 
@@ -96,14 +99,21 @@ function parseLambert72Filename(filename) {
 
 function loadSTLTiles() {
 
-    // STL files to load
-    const stlFiles = [
+    // Building STL files to load
+    const buildingFiles = [
         'data/Dwg_105000_192000_10_2_N_2009/Geb_105000_192000_10_2_N_2013.stl',
         'data/Dwg_105000_193000_10_2_N_2009/Geb_105000_193000_10_2_N_2013.stl'
     ];
 
-    // Parse coordinates
-    const tiles = stlFiles.map(parseLambert72Filename);
+    // Terrain STL files to load
+    const terrainFiles = [
+        'data/Dwg_105000_192000_10_2_N_2009/Trn_105000_192000_10_0_N_2013.stl',
+        'data/Dwg_105000_193000_10_2_N_2009/Trn_105000_193000_10_0_N_2013.stl'
+    ];
+
+    // Parse coordinates from all files
+    const allFiles = [...buildingFiles, ...terrainFiles];
+    const tiles = allFiles.map(parseLambert72Filename);
 
     // Find the minimum coordinates to use as origin
     const minX = Math.min(...tiles.map(t => t.x));
@@ -112,7 +122,8 @@ function loadSTLTiles() {
     // Load STL files
     const loader = new STLLoader();
 
-    const material = new THREE.MeshPhongMaterial({
+    // Material for buildings
+    const buildingMaterial = new THREE.MeshPhongMaterial({
         color: 0xffffff,
         specular: 0x111111,
         shininess: 200,
@@ -122,28 +133,67 @@ function loadSTLTiles() {
         depthWrite: true
     });
 
+    // Material for terrain
+    const terrainMaterial = new THREE.MeshPhongMaterial({
+        color: 0xcccccc, // Bright gray
+        specular: 0x050505,
+        shininess: 5,
+        flatShading: true,
+        side: THREE.DoubleSide,
+        depthTest: true,
+        depthWrite: true
+    });
+
     tiles.forEach(tile => {
+        // Determine if this is a terrain or building file
+        const isTerrain = tile.filename.includes('Trn_');
+        const material = isTerrain ? terrainMaterial : buildingMaterial;
+
         loader.load(
             tile.filename,
             (geometry) => {
-                // Center the geometry to origin
-                geometry.center();
+                console.log('=== Loading:', tile.filename);
+                console.log('Tile coords:', tile.x, tile.y);
+                console.log('Is terrain?', isTerrain);
 
-                // Scale geometry to make it ~1000 units wide
-                const scaleFactor = 0.001
+                // Compute bounding box before any transforms
+                geometry.computeBoundingBox();
+                let box = geometry.boundingBox;
+                console.log('Original bbox min:', box.min.x, box.min.y, box.min.z);
+                console.log('Original bbox max:', box.max.x, box.max.y, box.max.z);
+
+                // Scale geometry from millimeters to meters
+                const scaleFactor = 0.001;
                 geometry.scale(scaleFactor, scaleFactor, scaleFactor);
+
+                geometry.computeBoundingBox();
+                box = geometry.boundingBox;
+                console.log('After scale min:', box.min.x, box.min.y, box.min.z);
+                console.log('After scale max:', box.max.x, box.max.y, box.max.z);
+
+                // Center on X/Y but not Z (height)
+                const centerX = (box.min.x + box.max.x) / 2;
+                const centerY = (box.min.y + box.max.y) / 2;
+                geometry.translate(-centerX, -centerY, -box.min.z);
+
+                geometry.computeBoundingBox();
+                box = geometry.boundingBox;
+                console.log('After center min:', box.min.x, box.min.y, box.min.z);
+                console.log('After center max:', box.max.x, box.max.y, box.max.z);
 
                 // Create mesh
                 const mesh = new THREE.Mesh(geometry, material);
 
                 // Calculate relative position from origin based on filename coordinates
-                const scale = 1.0;
-                const relativeX = (tile.x - minX) * scale;
-                const relativeY = (tile.y - minY) * scale;
+                const relativeX = (tile.x - minX);
+                const relativeY = (tile.y - minY);
 
                 // Position the tile using filename coordinates
                 // In Lambert-1972, Y increases northward, so we use -relativeY for Z
                 mesh.position.set(relativeX, 0, -relativeY);
+
+                console.log('Mesh position:', mesh.position);
+                console.log('---');
 
                 // Rotate to align properly (STL is typically Z-up, Three.js is Y-up)
                 mesh.rotation.x = -Math.PI / 2;
