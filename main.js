@@ -27,6 +27,7 @@ function init() {
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setAnimationLoop(animate);
+    renderer.sortObjects = false; // Disable automatic sorting, rely on depth buffer
     document.body.appendChild(renderer.domElement);
 
     // Stats
@@ -115,7 +116,10 @@ function loadSTLTiles() {
         color: 0xffffff,
         specular: 0x111111,
         shininess: 200,
-        flatShading: true
+        flatShading: true,
+        side: THREE.DoubleSide,
+        depthTest: true,
+        depthWrite: true
     });
 
     tiles.forEach(tile => {
