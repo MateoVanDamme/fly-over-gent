@@ -8,6 +8,10 @@ const totalTiles = 4; // 2 building tiles + 2 terrain tiles
 
 const clock = new THREE.Clock();
 
+// Data source configuration
+const USE_ONLINE_DATA = true; // true = online storage, false = local data folder
+const ONLINE_DATA_BASE = 'https://storage.googleapis.com/fly-over-ghent/';
+
 // Rendering constants
 const MAX_RENDER_DISTANCE = 4000; // Maximum view distance in meters
 
@@ -40,7 +44,7 @@ function init() {
     // Camera setup
     camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, MAX_RENDER_DISTANCE);
     camera.rotation.order = 'YXZ';
-    camera.position.set(0, 10, 0);
+    camera.position.set(0, 50, 0);
 
     // Lights - much brighter
     const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
@@ -99,16 +103,19 @@ function parseLambert72Filename(filename) {
 
 function loadSTLTiles() {
 
+    // Data path prefix based on configuration
+    const dataPath = USE_ONLINE_DATA ? ONLINE_DATA_BASE : 'data/';
+
     // Building STL files to load
     const buildingFiles = [
-        'data/Dwg_105000_192000_10_2_N_2009/Geb_105000_192000_10_2_N_2013.stl',
-        'data/Dwg_105000_193000_10_2_N_2009/Geb_105000_193000_10_2_N_2013.stl'
+        dataPath + 'Dwg_105000_192000_10_2_N_2009/Geb_105000_192000_10_2_N_2013.stl',
+        dataPath + 'Dwg_105000_193000_10_2_N_2009/Geb_105000_193000_10_2_N_2013.stl'
     ];
 
     // Terrain STL files to load
     const terrainFiles = [
-        'data/Dwg_105000_192000_10_2_N_2009/Trn_105000_192000_10_0_N_2013.stl',
-        'data/Dwg_105000_193000_10_2_N_2009/Trn_105000_193000_10_0_N_2013.stl'
+        dataPath + 'Dwg_105000_192000_10_2_N_2009/Trn_105000_192000_10_0_N_2013.stl',
+        dataPath + 'Dwg_105000_193000_10_2_N_2009/Trn_105000_193000_10_0_N_2013.stl'
     ];
 
     // Parse coordinates from all files
@@ -152,34 +159,16 @@ function loadSTLTiles() {
         loader.load(
             tile.filename,
             (geometry) => {
-                console.log('=== Loading:', tile.filename);
-                console.log('Tile coords:', tile.x, tile.y);
-                console.log('Is terrain?', isTerrain);
-
-                // Compute bounding box before any transforms
-                geometry.computeBoundingBox();
-                let box = geometry.boundingBox;
-                console.log('Original bbox min:', box.min.x, box.min.y, box.min.z);
-                console.log('Original bbox max:', box.max.x, box.max.y, box.max.z);
-
                 // Scale geometry from millimeters to meters
                 const scaleFactor = 0.001;
                 geometry.scale(scaleFactor, scaleFactor, scaleFactor);
 
-                geometry.computeBoundingBox();
-                box = geometry.boundingBox;
-                console.log('After scale min:', box.min.x, box.min.y, box.min.z);
-                console.log('After scale max:', box.max.x, box.max.y, box.max.z);
-
                 // Center on X/Y but not Z (height)
+                geometry.computeBoundingBox();
+                const box = geometry.boundingBox;
                 const centerX = (box.min.x + box.max.x) / 2;
                 const centerY = (box.min.y + box.max.y) / 2;
                 geometry.translate(-centerX, -centerY, -box.min.z);
-
-                geometry.computeBoundingBox();
-                box = geometry.boundingBox;
-                console.log('After center min:', box.min.x, box.min.y, box.min.z);
-                console.log('After center max:', box.max.x, box.max.y, box.max.z);
 
                 // Create mesh
                 const mesh = new THREE.Mesh(geometry, material);
@@ -191,9 +180,6 @@ function loadSTLTiles() {
                 // Position the tile using filename coordinates
                 // In Lambert-1972, Y increases northward, so we use -relativeY for Z
                 mesh.position.set(relativeX, 0, -relativeY);
-
-                console.log('Mesh position:', mesh.position);
-                console.log('---');
 
                 // Rotate to align properly (STL is typically Z-up, Three.js is Y-up)
                 mesh.rotation.x = -Math.PI / 2;
