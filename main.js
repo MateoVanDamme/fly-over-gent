@@ -73,7 +73,7 @@ function init() {
             const gridSize = 3000;
             const divisions = 3;
             gridHelper = new THREE.GridHelper(gridSize, divisions);
-            gridHelper.position.set(0, 0, 0);
+            gridHelper.position.set(500, 0, -500);
             scene.add(gridHelper);
         },
         (filename, error) => {
