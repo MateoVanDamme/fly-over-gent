@@ -2,6 +2,8 @@
 
 Interactive 3D viewer for flying through the city of Gent using real city data.
 
+The site is live at: https://mateovandamme.github.io/fly-over-gent/
+
 ## Features
 
 - First-person flight controls with mouse look
@@ -18,9 +20,15 @@ Interactive 3D viewer for flying through the city of Gent using real city data.
 - **Shift** to fly down
 - **ESC** to release mouse
 
-## Data Source
+## Data Source & License
 
-Official Gent city data: https://data.stad.gent/explore/dataset/gent-in-3d/table/
+This project uses 3D city data from the City of Gent, made available under the **Modellicentie Gratis Hergebruik Vlaanderen v1.0** (Free Reuse Model License Flanders v1.0).
+
+**Source:** City of Gent - Gent in 3D
+**Dataset:** https://data.stad.gent/explore/dataset/gent-in-3d/table/
+**License:** https://www.vlaanderen.be/digitaal-vlaanderen/onze-diensten-en-platformen/open-data/voorwaarden-voor-het-hergebruik-van-overheidsinformatie/modellicentie-gratis-hergebruik
+
+Contains government information obtained under the free reuse model license Flanders v1.0.
 
 ## Preprocessing
 
