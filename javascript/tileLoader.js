@@ -99,9 +99,11 @@ export function loadSTLTiles(scene, onProgress, onComplete, onError) {
                 // Create mesh
                 const mesh = new THREE.Mesh(geometry, material);
 
-                // Add edge highlighting
-                const edges = new THREE.EdgesGeometry(geometry, 30); // 30 degree threshold
-                const lineMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 1 });
+                // Add edge highlighting - different thresholds and colors for terrain vs buildings
+                const edgeThreshold = isTerrain ? 1 : 10; // Higher threshold for terrain (only sharp edges)
+                const edgeColor = isTerrain ? 0x999999 : 0x000000; // Gray for terrain, black for buildings
+                const edges = new THREE.EdgesGeometry(geometry, edgeThreshold);
+                const lineMaterial = new THREE.LineBasicMaterial({ color: edgeColor, linewidth: 1 });
                 const edgeLines = new THREE.LineSegments(edges, lineMaterial);
                 mesh.add(edgeLines);
 
