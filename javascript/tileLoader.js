@@ -89,18 +89,15 @@ export function loadSTLTiles(scene, onProgress, onComplete, onError) {
                 const scaleFactor = 0.001;
                 geometry.scale(scaleFactor, scaleFactor, scaleFactor);
 
-                // Center on X/Y but not Z (height)
-                geometry.computeBoundingBox();
-                const box = geometry.boundingBox;
-                const centerX = (box.min.x + box.max.x) / 2;
-                const centerY = (box.min.y + box.max.y) / 2;
-                geometry.translate(-centerX, -centerY, 0);
+                // Translate by Lambert-72 coordinates to maintain alignment
+                // Subtract tile coordinates to move geometry to relative position
+                geometry.translate(-tile.x, -tile.y, 0);
 
                 // Create mesh
                 const mesh = new THREE.Mesh(geometry, material);
 
                 // Add edge highlighting - different thresholds and colors for terrain vs buildings
-                const edgeThreshold = isTerrain ? 1 : 10; // Higher threshold for terrain (only sharp edges)
+                const edgeThreshold = isTerrain ? 1 : 10; // Lower threshold for terrain
                 const edgeColor = isTerrain ? 0x999999 : 0x000000; // Gray for terrain, black for buildings
                 const edges = new THREE.EdgesGeometry(geometry, edgeThreshold);
                 const lineMaterial = new THREE.LineBasicMaterial({ color: edgeColor, linewidth: 1 });
@@ -123,7 +120,7 @@ export function loadSTLTiles(scene, onProgress, onComplete, onError) {
                 loadedCount++;
 
                 if (onProgress) {
-                    onProgress(loadedCount, totalTiles);
+                    onProgress(loadedCount, totalTiles, tile.filename);
                 }
 
                 if (loadedCount === totalTiles && onComplete) {

@@ -59,9 +59,10 @@ function init() {
     // Load STL tiles
     loadSTLTiles(
         scene,
-        (loadedCount, totalTiles) => {
+        (loadedCount, totalTiles, filename) => {
             // Progress callback
-            console.log(`Loading tiles: ${loadedCount}/${totalTiles}`);
+            const tileName = filename.split('/').pop();
+            console.log(`Loading tiles: ${loadedCount}/${totalTiles} - ${tileName}`);
         },
         () => {
             // Complete callback
