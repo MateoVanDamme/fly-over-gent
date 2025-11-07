@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
 // Data source configuration
-export const USE_ONLINE_DATA = true; // true = online storage, false = local data folder
+export const USE_ONLINE_DATA = false; // true = online storage, false = local data folder
 export const ONLINE_DATA_BASE = 'https://storage.googleapis.com/fly-over-ghent/';
 
 /**
@@ -32,14 +32,14 @@ export function loadSTLTiles(scene, onProgress, onComplete, onError) {
 
     // Building STL files to load
     const buildingFiles = [
-        dataPath + 'Dwg_105000_192000_10_2_N_2009/Geb_105000_192000_10_2_N_2013.stl',
-        dataPath + 'Dwg_105000_193000_10_2_N_2009/Geb_105000_193000_10_2_N_2013.stl'
+        dataPath + 'Dwg_103000_190000_10_2_N_2013/ACAD-Geb_103000_190000_10_2_N_2013.stl',
+        dataPath + 'Dwg_103000_191000_10_2_N_2009/ACAD-Geb_103000_191000_10_2_N_2013.stl'
     ];
 
     // Terrain STL files to load
     const terrainFiles = [
-        dataPath + 'Dwg_105000_192000_10_2_N_2009/Trn_105000_192000_10_0_N_2013.stl',
-        dataPath + 'Dwg_105000_193000_10_2_N_2009/Trn_105000_193000_10_0_N_2013.stl'
+        dataPath + 'Dwg_103000_190000_10_2_N_2013/ACAD-Trn_103000_190000_10_0_N_2013.stl',
+        dataPath + 'Dwg_103000_191000_10_2_N_2009/ACAD-Trn_103000_191000_10_0_N_2013.stl'
     ];
 
     // Parse coordinates from all files
@@ -85,9 +85,8 @@ export function loadSTLTiles(scene, onProgress, onComplete, onError) {
         loader.load(
             tile.filename,
             (geometry) => {
-                // Scale geometry from millimeters to meters
-                const scaleFactor = 0.001;
-                geometry.scale(scaleFactor, scaleFactor, scaleFactor);
+                // STL files exported from the new DXF workflow are already in meters
+                // No scaling needed (1:1)
 
                 // Translate by Lambert-72 coordinates to maintain alignment
                 // Subtract tile coordinates to move geometry to relative position

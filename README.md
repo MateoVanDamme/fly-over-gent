@@ -32,10 +32,45 @@ Contains government information obtained under the free reuse model license Flan
 
 ## Preprocessing
 
-1. Open DWG file in AutoCAD
-2. Convert to IGES format
-3. Open in FreeCAD
-4. Export as STL with proper scale (1 unit = 1 meter)
+The `pre-processing/` directory contains Python scripts to convert DWG files to STL format.
+
+### Requirements
+
+```bash
+pip install ezdxf numpy numpy-stl
+```
+
+**Note:** DWG to DXF conversion requires AutoCAD installed on Windows with `pyautocad`.
+
+### Workflow
+
+1. **Convert DWG to DXF** (requires AutoCAD on Windows):
+   ```bash
+   python pre-processing/dwg_to_dxf_v3.py <input.dwg>
+   ```
+   This generates DXF files in the same directory as the input file.
+
+2. **Inspect DXF** (optional - to verify geometry):
+   ```bash
+   python pre-processing/inspect_dwg.py <output.dxf>
+   ```
+   Shows entity counts and types in the DXF file.
+
+3. **Convert DXF to STL**:
+   ```bash
+   python pre-processing/dxf_to_stl_3dface.py <output.dxf>
+   ```
+   Converts 3DFACE entities and POLYLINE meshes to STL format.
+
+### Output Format
+
+The scripts export STL files with coordinates in **meters** and Lambert-72 coordinate system positioning. The resulting STL files can be placed directly in the `data/` directory structure.
+
+### File Types
+
+The Gent 3D dataset contains two types of files per tile:
+- **Buildings** (`Geb_*.dwg`) - 3D building models
+- **Terrain** (`Trn_*.dwg`) - Ground elevation data
 
 ## Tech Stack
 
