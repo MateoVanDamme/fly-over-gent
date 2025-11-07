@@ -30,25 +30,36 @@ This project uses 3D city data from the City of Gent, made available under the *
 
 Contains government information obtained under the free reuse model license Flanders v1.0.
 
-## Preprocessing
+## Data Pipeline
+
+### 1. Download Data
+
+Download all DWG files from the Gent 3D dataset:
+
+```bash
+python pre-processing/download_gent_data.py
+```
+
+This will download all building and terrain tiles from the City of Gent open data portal and organize them into the `data/` directory.
+
+### 2. Convert to STL Format
 
 The `pre-processing/` directory contains Python scripts to convert DWG files to STL format.
 
-### Requirements
+#### Requirements
 
 ```bash
-pip install ezdxf numpy numpy-stl
+pip install ezdxf numpy numpy-stl requests
 ```
 
 **Note:** DWG to DXF conversion requires AutoCAD installed on Windows with `pyautocad`.
 
-### Workflow
+#### Workflow
+
+**Single File Conversion:**
 
 1. **Convert DWG to DXF** (requires AutoCAD on Windows):
-   ```bash
-   python pre-processing/dwg_to_dxf_v3.py <input.dwg>
-   ```
-   This generates DXF files in the same directory as the input file.
+   Enter AutoCAD and do DXFOUT manually. 
 
 2. **Inspect DXF** (optional - to verify geometry):
    ```bash
@@ -62,11 +73,40 @@ pip install ezdxf numpy numpy-stl
    ```
    Converts 3DFACE entities and POLYLINE meshes to STL format.
 
-### Output Format
+**Batch Conversion:**
+
+Convert all DXF files in a directory using parallel processing:
+
+```bash
+# Convert all DXF files to a specific output directory
+python pre-processing/batch_dxf_to_stl.py data/ --output data/stl
+
+# Convert only terrain files
+python pre-processing/batch_dxf_to_stl.py data/ --pattern "*Trn_*.dxf" --output data/stl
+
+# Skip files that already have STL outputs
+python pre-processing/batch_dxf_to_stl.py data/ --skip-existing --output data/stl
+
+# Use specific number of workers
+python pre-processing/batch_dxf_to_stl.py data/ --workers 4 --output data/stl
+```
+
+**Windows Example:**
+```cmd
+python pre-processing\batch_dxf_to_stl.py "C:\Repos\home\fly-over-gent\data" --output "C:\Repos\home\fly-over-gent\data\stl" --skip-existing
+```
+
+This command will:
+- Search recursively for all DXF files in the `data` directory
+- Convert them to STL format using parallel processing
+- Output all STL files to `data\stl\`
+- Skip files that are already converted (saves time on subsequent runs)
+
+#### Output Format
 
 The scripts export STL files with coordinates in **meters** and Lambert-72 coordinate system positioning. The resulting STL files can be placed directly in the `data/` directory structure.
 
-### File Types
+#### File Types
 
 The Gent 3D dataset contains two types of files per tile:
 - **Buildings** (`Geb_*.dwg`) - 3D building models
