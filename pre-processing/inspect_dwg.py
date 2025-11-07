@@ -60,7 +60,7 @@ def inspect_dwg(dwg_path):
                 # Use SaveAs to export to DXF
                 doc_acad.SaveAs(str(dxf_path), 12)  # 12 = acR12_dxf format
 
-                print("✓ Converted to DXF")
+                print("[OK] Converted to DXF")
 
                 # Close without saving
                 doc_acad.Close(False)
@@ -72,7 +72,7 @@ def inspect_dwg(dwg_path):
                 doc = ezdxf.readfile(str(dxf_path))
 
             except Exception as e:
-                print(f"\n✗ AutoCAD conversion failed: {e}")
+                print(f"\n[FAIL] AutoCAD conversion failed: {e}")
                 print("\nPlease manually convert the DWG to DXF and run:")
                 print(f"  python inspect_dwg.py {dwg_path.with_suffix('.dxf').name}")
                 return
@@ -81,7 +81,7 @@ def inspect_dwg(dwg_path):
             print("\nAttempting to read DXF with ezdxf...")
             doc = ezdxf.readfile(str(dwg_path))
 
-        print(f"✓ Successfully opened!")
+        print(f"[OK] Successfully opened!")
         print(f"DXF Version: {doc.dxfversion}")
         print(f"Number of layouts: {len(doc.layouts)}")
 
@@ -109,7 +109,7 @@ def inspect_dwg(dwg_path):
 
         # Check for blocks
         if 'INSERT' in entity_types:
-            print(f"\n✓ Found {entity_types['INSERT']} INSERT (block references)")
+            print(f"\n[OK] Found {entity_types['INSERT']} INSERT (block references)")
             print("  Blocks found:")
             block_refs = {}
             for entity in msp.query('INSERT'):
@@ -122,12 +122,12 @@ def inspect_dwg(dwg_path):
 
         # Check for 3D solids
         if '3DSOLID' in entity_types:
-            print(f"\n✓ Found {entity_types['3DSOLID']} 3DSOLID entities")
+            print(f"\n[OK] Found {entity_types['3DSOLID']} 3DSOLID entities")
             has_3d = True
 
         # Check for meshes
         if 'MESH' in entity_types:
-            print(f"\n✓ Found {entity_types['MESH']} MESH entities")
+            print(f"\n[OK] Found {entity_types['MESH']} MESH entities")
             has_3d = True
 
         # Check for polyface meshes
@@ -137,12 +137,12 @@ def inspect_dwg(dwg_path):
                 if entity.is_poly_face_mesh:
                     polyface_count += 1
             if polyface_count > 0:
-                print(f"\n✓ Found {polyface_count} POLYFACE MESH entities")
+                print(f"\n[OK] Found {polyface_count} POLYFACE MESH entities")
                 has_3d = True
 
         # Check for 3DFACE
         if '3DFACE' in entity_types:
-            print(f"\n✓ Found {entity_types['3DFACE']} 3DFACE entities")
+            print(f"\n[OK] Found {entity_types['3DFACE']} 3DFACE entities")
             has_3d = True
 
         if not has_3d:
@@ -173,8 +173,8 @@ def inspect_dwg(dwg_path):
         print("="*60)
 
         if has_3d:
-            print("✓ This file contains 3D geometry")
-            print("✓ ezdxf can read the file")
+            print("[OK] This file contains 3D geometry")
+            print("[OK] ezdxf can read the file")
             print("\nNext steps:")
             print("  - We can extract the 3D geometry using ezdxf")
             print("  - Convert to meshes and export to STL")
@@ -183,12 +183,12 @@ def inspect_dwg(dwg_path):
             print("  - May need AutoCAD to export")
 
     except ezdxf.DXFStructureError as e:
-        print(f"✗ Cannot read DWG structure: {e}")
+        print(f"[FAIL] Cannot read DWG structure: {e}")
         print("\nThis DWG file may need to be converted to DXF first.")
         print("Try using ODA File Converter or AutoCAD to convert to DXF.")
 
     except Exception as e:
-        print(f"✗ Error: {e}")
+        print(f"[FAIL] Error: {e}")
         import traceback
         traceback.print_exc()
 

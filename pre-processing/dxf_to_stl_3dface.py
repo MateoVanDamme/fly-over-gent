@@ -202,9 +202,57 @@ def dxf_to_stl_3dface(dxf_path, stl_path=None):
                 except Exception as e:
                     invalid_3dface += 1
 
+            # Also process POLYLINE entities within the block
+            for block_entity in block.query('POLYLINE'):
+                if block_entity.is_poly_face_mesh:
+                    try:
+                        # Process the polyface mesh
+                        vertices = []
+                        vertex_map = {}
+                        vertex_list = list(block_entity.vertices)
+
+                        # Collect vertex coordinates and apply block transformation
+                        for i, vertex in enumerate(vertex_list):
+                            if hasattr(vertex.dxf, 'location'):
+                                loc = vertex.dxf.location
+                                # Apply block transformation to get world coordinates
+                                transformed = insert_matrix.transform(loc)
+                                vertex_idx = len(vertices)
+                                vertices.append([transformed.x, transformed.y, transformed.z])
+                                vertex_map[i] = vertex_idx
+
+                        # Extract faces
+                        for vertex in vertex_list:
+                            if hasattr(vertex.dxf, 'vtx0'):
+                                face_indices = []
+
+                                for attr in ['vtx0', 'vtx1', 'vtx2', 'vtx3']:
+                                    if hasattr(vertex.dxf, attr):
+                                        idx = getattr(vertex.dxf, attr)
+                                        if idx is not None and idx != 0:
+                                            actual_idx = abs(idx) - 1
+                                            if actual_idx in vertex_map:
+                                                face_indices.append(vertex_map[actual_idx] + vertex_offset)
+
+                                if len(face_indices) >= 3:
+                                    if len(face_indices) == 3:
+                                        all_faces.append(face_indices)
+                                    elif len(face_indices) == 4:
+                                        all_faces.append([face_indices[0], face_indices[1], face_indices[2]])
+                                        all_faces.append([face_indices[0], face_indices[2], face_indices[3]])
+
+                        all_vertices.extend(vertices)
+                        vertex_offset += len(vertices)
+                        valid_polyline += 1
+
+                    except Exception as e:
+                        invalid_polyline += 1
+                        if invalid_polyline <= 5:
+                            print(f"  Warning: Skipped malformed POLYLINE in block: {e}")
+
             # Progress indicator
             if blocks_processed % 100 == 0:
-                print(f"  Processed {blocks_processed} blocks... ({valid_3dface:,} faces found)")
+                print(f"  Processed {blocks_processed} blocks... ({valid_3dface:,} 3DFACE, {valid_polyline:,} POLYLINE)")
 
         print(f"  Processed all {blocks_processed} blocks")
 

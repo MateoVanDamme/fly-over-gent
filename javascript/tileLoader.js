@@ -32,18 +32,17 @@ export function loadSTLTiles(scene, onProgress, onComplete, onError) {
 
     // Building STL files to load
     const buildingFiles = [
-        dataPath + 'stl/ACAD-Geb_103000_190000_10_2_N_2013.stl',
-        dataPath + 'stl/ACAD-Geb_103000_191000_10_2_N_2013.stl',
         dataPath + 'stl/ACAD-Geb_103000_192000_10_2_N_2013.stl',
         dataPath + 'stl/ACAD-Geb_103000_194000_10_2_N_2013.stl',
+        dataPath + 'stl/ACAD-Geb_104000_192000_10_2_N_2013.stl',
+        dataPath + 'stl/ACAD-Geb_104000_193000_10_2_N_2013.stl',
+        dataPath + 'stl/ACAD-Geb_104000_194000_10_2_N_2013.stl',
         dataPath + 'stl/ACAD-Geb_105000_192000_10_2_N_2013.stl',
         dataPath + 'stl/ACAD-Geb_105000_193000_10_2_N_2013.stl'
     ];
 
     // Terrain STL files to load
     const terrainFiles = [
-        dataPath + 'stl/ACAD-Trn_103000_190000_10_0_N_2013.stl',
-        dataPath + 'stl/ACAD-Trn_103000_191000_10_0_N_2013.stl',
         dataPath + 'stl/ACAD-Trn_103000_192000_10_0_N_2013.stl',
         dataPath + 'stl/ACAD-Trn_103000_194000_10_0_N_2013.stl',
         dataPath + 'stl/ACAD-Trn_104000_192000_10_0_N_2013.stl',
