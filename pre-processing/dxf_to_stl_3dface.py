@@ -221,6 +221,9 @@ def dxf_to_stl_3dface(dxf_path, stl_path=None):
                                 vertices.append([transformed.x, transformed.y, transformed.z])
                                 vertex_map[i] = vertex_idx
 
+                        # Get the starting index for this mesh in the global vertex list
+                        start_idx = len(all_vertices)
+
                         # Extract faces
                         for vertex in vertex_list:
                             if hasattr(vertex.dxf, 'vtx0'):
@@ -232,7 +235,8 @@ def dxf_to_stl_3dface(dxf_path, stl_path=None):
                                         if idx is not None and idx != 0:
                                             actual_idx = abs(idx) - 1
                                             if actual_idx in vertex_map:
-                                                face_indices.append(vertex_map[actual_idx] + vertex_offset)
+                                                # Add start_idx to make it relative to global vertex list
+                                                face_indices.append(vertex_map[actual_idx] + start_idx)
 
                                 if len(face_indices) >= 3:
                                     if len(face_indices) == 3:
@@ -242,7 +246,6 @@ def dxf_to_stl_3dface(dxf_path, stl_path=None):
                                         all_faces.append([face_indices[0], face_indices[2], face_indices[3]])
 
                         all_vertices.extend(vertices)
-                        vertex_offset += len(vertices)
                         valid_polyline += 1
 
                     except Exception as e:
