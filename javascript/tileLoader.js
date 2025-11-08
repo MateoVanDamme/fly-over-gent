@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
 // Data source configuration
-export const USE_ONLINE_DATA = false; // true = online storage, false = local data folder
+export const USE_ONLINE_DATA = true; // true = online storage, false = local data folder
 export const ONLINE_DATA_BASE = 'https://storage.googleapis.com/fly-over-ghent/';
 
 /**
