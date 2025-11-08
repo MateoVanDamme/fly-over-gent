@@ -70,10 +70,8 @@ export function loadSTLTiles(scene, onProgress, onComplete, onError) {
     const totalTiles = tiles.length;
 
     // Material for buildings
-    const buildingMaterial = new THREE.MeshPhongMaterial({
+    const buildingMaterial = new THREE.MeshLambertMaterial({
         color: 0xffffff,
-        specular: 0x111111,
-        shininess: 200,
         flatShading: true,
         side: THREE.DoubleSide,
         depthTest: true,
@@ -81,10 +79,8 @@ export function loadSTLTiles(scene, onProgress, onComplete, onError) {
     });
 
     // Material for terrain - same as buildings
-    const terrainMaterial = new THREE.MeshPhongMaterial({
+    const terrainMaterial = new THREE.MeshLambertMaterial({
         color: 0xffffff,
-        specular: 0x111111,
-        shininess: 200,
         flatShading: true,
         side: THREE.DoubleSide,
         depthTest: true,
