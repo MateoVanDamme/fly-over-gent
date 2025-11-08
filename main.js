@@ -40,17 +40,13 @@ function init() {
     camera.rotation.order = 'YXZ';
     camera.position.set(0, 50, 0);
 
-    // Lights - much brighter
+    // Lights - ambient + one directional for performance
     const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
     scene.add(ambientLight);
 
     const dirLight1 = new THREE.DirectionalLight(0xffffff, 2);
     dirLight1.position.set(1000, 1000, 1000);
     scene.add(dirLight1);
-
-    const dirLight2 = new THREE.DirectionalLight(0xffffff, 1);
-    dirLight2.position.set(-1000, 500, -1000);
-    scene.add(dirLight2);
 
     // Grid helper for reference (will be resized after tiles load)
     gridHelper = new THREE.GridHelper(2000, 20);
