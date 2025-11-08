@@ -5,6 +5,23 @@ import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 export const USE_ONLINE_DATA = true; // true = online storage, false = local data folder
 export const ONLINE_DATA_BASE = 'https://storage.googleapis.com/fly-over-ghent/';
 
+// Shared materials for better performance (reused across all tiles)
+const buildingMaterial = new THREE.MeshLambertMaterial({
+    color: 0xffffff,
+    flatShading: true,
+    side: THREE.DoubleSide,
+    depthTest: true,
+    depthWrite: true
+});
+
+const terrainMaterial = new THREE.MeshLambertMaterial({
+    color: 0xffffff,
+    flatShading: true,
+    side: THREE.DoubleSide,
+    depthTest: true,
+    depthWrite: true
+});
+
 /**
  * Parses Lambert-72 coordinates from a filename
  * Format: Geb_105000_192000_10_2_N_2013.stl
@@ -69,24 +86,6 @@ export function loadSTLTiles(scene, onProgress, onComplete, onError) {
     let loadedCount = 0;
     const totalTiles = tiles.length;
 
-    // Material for buildings
-    const buildingMaterial = new THREE.MeshLambertMaterial({
-        color: 0xffffff,
-        flatShading: true,
-        side: THREE.DoubleSide,
-        depthTest: true,
-        depthWrite: true
-    });
-
-    // Material for terrain - same as buildings
-    const terrainMaterial = new THREE.MeshLambertMaterial({
-        color: 0xffffff,
-        flatShading: true,
-        side: THREE.DoubleSide,
-        depthTest: true,
-        depthWrite: true
-    });
-
     tiles.forEach(tile => {
         // Determine if this is a terrain or building file
         const isTerrain = tile.filename.includes('Trn_');
@@ -101,6 +100,9 @@ export function loadSTLTiles(scene, onProgress, onComplete, onError) {
                 // Translate by Lambert-72 coordinates to maintain alignment
                 // Subtract tile coordinates to move geometry to relative position
                 geometry.translate(-tile.x, -tile.y, 0);
+
+                // Compute bounding sphere for efficient frustum culling
+                geometry.computeBoundingSphere();
 
                 // Create mesh
                 const mesh = new THREE.Mesh(geometry, material);
