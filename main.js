@@ -21,7 +21,7 @@ function init() {
     // Scene setup
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x222222);
-    scene.fog = new THREE.Fog(0x222222, 10, MAX_RENDER_DISTANCE);
+    scene.fog = new THREE.Fog(0x222222, 0 , MAX_RENDER_DISTANCE);
 
     // Renderer setup
     renderer = new THREE.WebGLRenderer({ antialias: true });

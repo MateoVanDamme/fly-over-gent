@@ -14,6 +14,7 @@ const buildingMaterial = new THREE.MeshLambertMaterial({
     depthWrite: true
 });
 
+// Terrain material - Lambert with height-based color modification
 const terrainMaterial = new THREE.MeshLambertMaterial({
     color: 0xffffff,
     flatShading: true,
@@ -21,6 +22,43 @@ const terrainMaterial = new THREE.MeshLambertMaterial({
     depthTest: true,
     depthWrite: true
 });
+
+// Inject height cutoff into Lambert shader
+terrainMaterial.onBeforeCompile = (shader) => {
+    // Add uniform for cutoff height
+    shader.uniforms.cutoffHeight = { value: 6.5 };
+    shader.uniforms.lowColor = { value: new THREE.Color(0x5577ff) };
+    shader.uniforms.highColor = { value: new THREE.Color(0xffffff) };
+
+    // Add varying to pass height from vertex to fragment shader
+    shader.vertexShader = shader.vertexShader.replace(
+        '#include <common>',
+        `#include <common>
+        varying float vHeight;`
+    );
+
+    shader.vertexShader = shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+        vHeight = position.z;`
+    );
+
+    // Modify fragment shader to use height-based color
+    shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <common>',
+        `#include <common>
+        uniform float cutoffHeight;
+        uniform vec3 lowColor;
+        uniform vec3 highColor;
+        varying float vHeight;`
+    );
+
+    shader.fragmentShader = shader.fragmentShader.replace(
+        'vec4 diffuseColor = vec4( diffuse, opacity );',
+        `vec3 heightColor = vHeight < cutoffHeight ? lowColor : highColor;
+        vec4 diffuseColor = vec4( heightColor, opacity );`
+    );
+};
 
 /**
  * Parses Lambert-72 coordinates from a filename
