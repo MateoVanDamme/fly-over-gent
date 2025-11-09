@@ -38,6 +38,7 @@ function parseLambert72Filename(filename) {
 
 /**
  * Loads and processes STL tiles for buildings and terrain
+ * Tiles are automatically centered around the origin (0, 0, 0)
  * @param {THREE.Scene} scene - The Three.js scene to add meshes to
  * @param {Function} onProgress - Callback for loading progress (loadedCount, totalTiles)
  * @param {Function} onComplete - Callback when all tiles are loaded
@@ -77,9 +78,15 @@ export function loadSTLTiles(scene, onProgress, onComplete, onError) {
     const allFiles = [...buildingFiles, ...terrainFiles];
     const tiles = allFiles.map(parseLambert72Filename);
 
-    // Find the minimum coordinates to use as origin
+    // Find the minimum and maximum coordinates
     const minX = Math.min(...tiles.map(t => t.x));
     const minY = Math.min(...tiles.map(t => t.y));
+    const maxX = Math.max(...tiles.map(t => t.x));
+    const maxY = Math.max(...tiles.map(t => t.y));
+
+    // Calculate center of all tiles for offsetting
+    const centerX = (maxX - minX) / 2;
+    const centerY = (maxY - minY) / 2;
 
     // Load STL files
     const loader = new STLLoader();
@@ -119,9 +126,9 @@ export function loadSTLTiles(scene, onProgress, onComplete, onError) {
                 const relativeX = (tile.x - minX);
                 const relativeY = (tile.y - minY);
 
-                // Position the tile using filename coordinates
+                // Position the tile centered around (0, 0, 0) by subtracting center offset
                 // In Lambert-1972, Y increases northward, so we use -relativeY for Z
-                mesh.position.set(relativeX, 0, -relativeY);
+                mesh.position.set(relativeX - centerX, 0, -(relativeY - centerY));
 
                 // Rotate to align properly (STL is typically Z-up, Three.js is Y-up)
                 mesh.rotation.x = -Math.PI / 2;

@@ -35,10 +35,10 @@ function init() {
     stats = new Stats();
     document.body.appendChild(stats.dom);
 
-    // Camera setup
+    // Camera setup - positioned at center since tiles are centered around origin
     camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, MAX_RENDER_DISTANCE);
     camera.rotation.order = 'YXZ';
-    camera.position.set(0, 50, 0);
+    camera.position.set(0, 100, 0);
 
     // Lights - ambient + one directional for performance
     const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
@@ -52,7 +52,7 @@ function init() {
     gridHelper = new THREE.GridHelper(2000, 20);
     scene.add(gridHelper);
 
-    // Load STL tiles
+    // Load STL tiles (tiles are centered around origin, so camera stays at 0,0,0)
     loadSTLTiles(
         scene,
         (loadedCount, totalTiles, filename) => {
@@ -64,12 +64,11 @@ function init() {
             // Complete callback
             document.getElementById('loading').style.display = 'none';
 
-            // Update grid to match scene size
+            // Update grid to match scene size (centered at origin)
             scene.remove(gridHelper);
             const gridSize = 3000;
             const divisions = 3;
             gridHelper = new THREE.GridHelper(gridSize, divisions);
-            gridHelper.position.set(500, 0, -500);
             scene.add(gridHelper);
         },
         (filename, error) => {
