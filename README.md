@@ -126,6 +126,7 @@ The following optimizations have been implemented to improve rendering performan
 - **Lambert Shading**: Using `MeshLambertMaterial` instead of `MeshPhongMaterial` for cheaper per-pixel lighting calculations (~30-40% faster)
 - **Flat Shading**: Enabled `flatShading: true` for simpler normal calculations and better visual clarity on architectural geometry
 - **Reduced Lighting**: Using 1 ambient + 1 directional light (down from 1 ambient + 2 directional) for fewer lighting calculations per fragment
+- **Single-Sided Rendering**: Using `THREE.BackSide` instead of `THREE.DoubleSide` renders only one face per triangle (50% fewer fragments). The STL files have inverted normals, so BackSide is the correct choice and is faster than DoubleSide
 
 ### Geometry & Memory Optimizations
 - **Material Reuse**: Materials are created once at module scope and shared across all tiles, improving GPU batching efficiency and reducing memory overhead

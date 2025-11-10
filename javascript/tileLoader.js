@@ -9,7 +9,7 @@ export const ONLINE_DATA_BASE = 'https://storage.googleapis.com/fly-over-ghent/'
 const buildingMaterial = new THREE.MeshLambertMaterial({
     color: 0xffffff,
     flatShading: true,
-    side: THREE.DoubleSide,
+    side: THREE.BackSide,
     depthTest: true,
     depthWrite: true
 });
@@ -17,8 +17,8 @@ const buildingMaterial = new THREE.MeshLambertMaterial({
 // Terrain material - Lambert with height-based color modification
 const terrainMaterial = new THREE.MeshLambertMaterial({
     color: 0xffffff,
-    flatShading: true,
-    side: THREE.DoubleSide,
+    flatShading: false,
+    side: THREE.BackSide,
     depthTest: true,
     depthWrite: true
 });
@@ -145,6 +145,9 @@ export function loadSTLTiles(scene, onProgress, onComplete, onError) {
                 // Translate by Lambert-72 coordinates to maintain alignment
                 // Subtract tile coordinates to move geometry to relative position
                 geometry.translate(-tile.x, -tile.y, 0);
+
+                // Compute normals properly
+                geometry.computeVertexNormals();
 
                 // Compute bounding sphere for efficient frustum culling
                 geometry.computeBoundingSphere();
