@@ -123,8 +123,8 @@ export function loadSTLTiles(scene, onProgress, onComplete, onError) {
     const maxY = Math.max(...tiles.map(t => t.y));
 
     // Calculate center of all tiles for offsetting
-    const centerX = (maxX - minX) / 2;
-    const centerY = (maxY - minY) / 2;
+    const centerX = (maxX - minX) / 2 + 500;
+    const centerY = (maxY - minY) / 2 + 500;
 
     // Load STL files
     const loader = new STLLoader();

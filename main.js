@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import Stats from 'three/addons/libs/stats.module.js';
 import { loadSTLTiles } from './javascript/tileLoader.js';
 
-let camera, scene, renderer, gridHelper, stats;
+let camera, scene, renderer, stats;
 
 const clock = new THREE.Clock();
 
@@ -48,10 +48,6 @@ function init() {
     dirLight1.position.set(1000, 1000, 1000);
     scene.add(dirLight1);
 
-    // Grid helper for reference (will be resized after tiles load)
-    gridHelper = new THREE.GridHelper(2000, 20);
-    scene.add(gridHelper);
-
     // Load STL tiles (tiles are centered around origin, so camera stays at 0,0,0)
     loadSTLTiles(
         scene,
@@ -63,13 +59,6 @@ function init() {
         () => {
             // Complete callback
             document.getElementById('loading').style.display = 'none';
-
-            // Update grid to match scene size (centered at origin)
-            scene.remove(gridHelper);
-            const gridSize = 3000;
-            const divisions = 3;
-            gridHelper = new THREE.GridHelper(gridSize, divisions);
-            scene.add(gridHelper);
         },
         (filename, error) => {
             // Error callback
