@@ -10,9 +10,16 @@ const clock = new THREE.Clock();
 // Rendering constants
 const MAX_RENDER_DISTANCE = 4000; // Maximum view distance in meters
 
-// FPS controls
-const playerVelocity = new THREE.Vector3();
-const playerDirection = new THREE.Vector3();
+// Camera system
+const cameraSystem = {
+    mode: 'orbit', // 'follow', 'orbit', 'chase', 'manual'
+    target: new THREE.Vector3(),
+    offset: new THREE.Vector3(0, 50, -100),
+    lookAhead: 50,
+    smoothness: 0.05,
+    currentBoidIndex: 0
+};
+
 const keyStates = {};
 
 init();
@@ -61,7 +68,7 @@ function init() {
             attractForce: 1.0,
             minDistance: 30,
             avoidForce: 0.5,
-            conformDirection: 0.5
+            conformDirection: 0.4
         }
     });
     scene.add(boidManager);
@@ -96,12 +103,44 @@ function init() {
         keyStates[event.code] = false;
     });
 
+    // Camera mode switching
+    document.addEventListener('keydown', (event) => {
+        const modeDisplay = document.getElementById('current-mode');
+
+        if (event.code === 'Digit1') {
+            cameraSystem.mode = 'follow';
+            modeDisplay.textContent = 'Follow';
+            console.log('Camera Mode: Follow (behind boid)');
+        } else if (event.code === 'Digit2') {
+            cameraSystem.mode = 'chase';
+            modeDisplay.textContent = 'Chase';
+            console.log('Camera Mode: Chase (close follow)');
+        } else if (event.code === 'Digit3') {
+            cameraSystem.mode = 'orbit';
+            modeDisplay.textContent = 'Orbit';
+            console.log('Camera Mode: Orbit (circular around flock)');
+        } else if (event.code === 'Digit4') {
+            cameraSystem.mode = 'manual';
+            modeDisplay.textContent = 'Manual';
+            console.log('Camera Mode: Manual (free control)');
+        } else if (event.code === 'Tab') {
+            event.preventDefault();
+            // Switch to next boid
+            if (boidManager && boidManager.boids.length > 0) {
+                cameraSystem.currentBoidIndex = (cameraSystem.currentBoidIndex + 1) % boidManager.boids.length;
+                console.log(`Following boid ${cameraSystem.currentBoidIndex + 1}/${boidManager.boids.length}`);
+            }
+        }
+    });
+
     document.body.addEventListener('click', () => {
-        document.body.requestPointerLock();
+        if (cameraSystem.mode === 'manual') {
+            document.body.requestPointerLock();
+        }
     });
 
     document.body.addEventListener('mousemove', (event) => {
-        if (document.pointerLockElement === document.body) {
+        if (cameraSystem.mode === 'manual' && document.pointerLockElement === document.body) {
             camera.rotation.y -= event.movementX / 500;
             camera.rotation.x -= event.movementY / 500;
         }
@@ -118,66 +157,127 @@ function onWindowResize() {
 
 }
 
-function getForwardVector() {
-    camera.getWorldDirection(playerDirection);
-    playerDirection.normalize();
-    return playerDirection;
-}
+function updateCinematicCamera(deltaTime) {
+    if (!boidManager || !boidManager.boids || boidManager.boids.length === 0) return;
 
-function getSideVector() {
-    camera.getWorldDirection(playerDirection);
-    playerDirection.normalize();
-    playerDirection.cross(camera.up);
-    return playerDirection;
-}
+    const time = clock.getElapsedTime();
 
-function controls(deltaTime) {
-    const speedDelta = deltaTime * 1000; // movement speed
+    if (cameraSystem.mode === 'follow') {
+        // Follow mode: camera behind and above the boid, looking ahead
+        const boid = boidManager.boids[cameraSystem.currentBoidIndex];
+        const boidPos = boid.pos.clone();
+        const boidVel = boid.vel.clone().normalize();
 
-    if (keyStates['KeyW']) {
-        playerVelocity.add(getForwardVector().multiplyScalar(speedDelta));
+        // Position camera behind the boid
+        const cameraOffset = boidVel.clone().multiplyScalar(-80).add(new THREE.Vector3(0, 40, 0));
+        const desiredPosition = boidPos.clone().add(cameraOffset);
+
+        // Look ahead of the boid
+        const lookAtPoint = boidPos.clone().add(boidVel.clone().multiplyScalar(cameraSystem.lookAhead));
+
+        // Smooth camera movement
+        camera.position.lerp(desiredPosition, cameraSystem.smoothness);
+
+        // Smooth camera rotation
+        const currentLookAt = new THREE.Vector3();
+        camera.getWorldDirection(currentLookAt);
+        currentLookAt.multiplyScalar(100).add(camera.position);
+        currentLookAt.lerp(lookAtPoint, cameraSystem.smoothness * 2);
+        camera.lookAt(currentLookAt);
+
+    } else if (cameraSystem.mode === 'chase') {
+        // Chase mode: close follow, like a pursuit camera
+        const boid = boidManager.boids[cameraSystem.currentBoidIndex];
+        const boidPos = boid.pos.clone();
+        const boidVel = boid.vel.clone().normalize();
+
+        // Closer camera position
+        const cameraOffset = boidVel.clone().multiplyScalar(-40).add(new THREE.Vector3(0, 15, 0));
+        const desiredPosition = boidPos.clone().add(cameraOffset);
+
+        // Look directly at the boid
+        camera.position.lerp(desiredPosition, cameraSystem.smoothness * 1.5);
+
+        const lookAtPoint = boidPos.clone().add(boidVel.clone().multiplyScalar(20));
+        const currentLookAt = new THREE.Vector3();
+        camera.getWorldDirection(currentLookAt);
+        currentLookAt.multiplyScalar(100).add(camera.position);
+        currentLookAt.lerp(lookAtPoint, cameraSystem.smoothness * 3);
+        camera.lookAt(currentLookAt);
+
+    } else if (cameraSystem.mode === 'orbit') {
+        // Orbit mode: camera orbits around the center of the flock
+        const center = boidManager.calculateCentroid();
+
+        // Circular orbit
+        const radius = 200;
+        const orbitSpeed = 0.1;
+        const angle = time * orbitSpeed;
+
+        const desiredPosition = new THREE.Vector3(
+            center.x + Math.cos(angle) * radius,
+            center.y + 80 + Math.sin(angle * 0.5) * 30, // Gentle height variation
+            center.z + Math.sin(angle) * radius
+        );
+
+        camera.position.lerp(desiredPosition, cameraSystem.smoothness);
+
+        // Look at the center of the flock
+        const currentLookAt = new THREE.Vector3();
+        camera.getWorldDirection(currentLookAt);
+        currentLookAt.multiplyScalar(100).add(camera.position);
+        currentLookAt.lerp(center, cameraSystem.smoothness * 2);
+        camera.lookAt(currentLookAt);
+
+    } else if (cameraSystem.mode === 'manual') {
+        // Manual mode: keyboard controls for fine-tuning
+        const speedDelta = deltaTime * 300;
+        const moveVector = new THREE.Vector3();
+
+        if (keyStates['KeyW']) {
+            const forward = new THREE.Vector3();
+            camera.getWorldDirection(forward);
+            moveVector.add(forward.multiplyScalar(speedDelta));
+        }
+        if (keyStates['KeyS']) {
+            const forward = new THREE.Vector3();
+            camera.getWorldDirection(forward);
+            moveVector.add(forward.multiplyScalar(-speedDelta));
+        }
+        if (keyStates['KeyA']) {
+            const left = new THREE.Vector3();
+            camera.getWorldDirection(left);
+            left.cross(camera.up);
+            moveVector.add(left.multiplyScalar(-speedDelta));
+        }
+        if (keyStates['KeyD']) {
+            const right = new THREE.Vector3();
+            camera.getWorldDirection(right);
+            right.cross(camera.up);
+            moveVector.add(right.multiplyScalar(speedDelta));
+        }
+        if (keyStates['Space']) {
+            moveVector.y += speedDelta;
+        }
+        if (keyStates['ShiftLeft'] || keyStates['ShiftRight']) {
+            moveVector.y -= speedDelta;
+        }
+
+        camera.position.add(moveVector);
     }
-
-    if (keyStates['KeyS']) {
-        playerVelocity.add(getForwardVector().multiplyScalar(-speedDelta));
-    }
-
-    if (keyStates['KeyA']) {
-        playerVelocity.add(getSideVector().multiplyScalar(-speedDelta));
-    }
-
-    if (keyStates['KeyD']) {
-        playerVelocity.add(getSideVector().multiplyScalar(speedDelta));
-    }
-
-    if (keyStates['Space']) {
-        playerVelocity.y += speedDelta;
-    }
-
-    if (keyStates['ShiftLeft'] || keyStates['ShiftRight']) {
-        playerVelocity.y -= speedDelta;
-    }
-}
-
-function updatePlayer(deltaTime) {
-    const damping = Math.exp(-4 * deltaTime) - 1;
-    playerVelocity.addScaledVector(playerVelocity, damping);
-
-    const deltaPosition = playerVelocity.clone().multiplyScalar(deltaTime);
-    camera.position.add(deltaPosition);
 }
 
 function animate() {
 
     const deltaTime = Math.min(0.05, clock.getDelta());
 
-    controls(deltaTime);
-    updatePlayer(deltaTime);
-
     // Update boids
     if (boidManager) {
         boidManager.tick(deltaTime);
     }
+
+    // Update cinematic camera
+    updateCinematicCamera(deltaTime);
 
     render();
 

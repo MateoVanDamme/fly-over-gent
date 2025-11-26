@@ -29,14 +29,41 @@
             font-size: 14px;
             font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Consolas', monospace;
         }
+        #camera-mode {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: #fff;
+            font-size: 16px;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Consolas', monospace;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 5px;
+            line-height: 1.6;
+        }
+        .key {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin: 0 2px;
+            font-weight: bold;
+        }
+        .active-mode {
+            color: #4af;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
     <div id="loading">Loading city tiles...</div>
     <div id="info">
-        Fly Over Gent<br />
-        Click to capture MOUSE and look around<br/>
-        WASD to move, SPACE to fly up, SHIFT to fly down
+        Fly Over Gent - Cinematic Boid Camera
+    </div>
+    <div id="camera-mode">
+        <div><span class="key">1</span> Follow | <span class="key">2</span> Chase | <span class="key">3</span> Orbit | <span class="key">4</span> Manual</div>
+        <div><span class="key">Tab</span> Next Boid</div>
+        <div style="margin-top: 10px;">Mode: <span id="current-mode" class="active-mode">Follow</span></div>
     </div>
 
     <script type="importmap">
