@@ -12,7 +12,7 @@ const MAX_RENDER_DISTANCE = 4000; // Maximum view distance in meters
 
 // Camera system
 const cameraSystem = {
-    mode: 'orbit', // 'follow', 'orbit', 'chase', 'manual'
+    mode: 'chase', // 'follow', 'orbit', 'chase', 'manual'
     target: new THREE.Vector3(),
     offset: new THREE.Vector3(0, 50, -100),
     lookAhead: 50,
@@ -65,7 +65,7 @@ function init() {
             constantVel: 50,
             centeringForce: 0.1 ,
             gravity: 0.1,
-            attractForce: 1.0,
+            attractForce: 0.3,
             minDistance: 30,
             avoidForce: 0.5,
             conformDirection: 0.4

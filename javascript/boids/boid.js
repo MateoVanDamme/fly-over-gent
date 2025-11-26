@@ -1,16 +1,46 @@
 import * as THREE from 'three';
+import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
-// Provide default boid mesh (bird-like shape)
-const boidSize = 2;
-const boidShape = new THREE.Shape()
-    .moveTo(0, 2 * boidSize)
-    .lineTo(boidSize, -boidSize)
-    .lineTo(0, 0)
-    .lineTo(-boidSize, -boidSize)
-    .lineTo(0, 2 * boidSize);
-const geometry = new THREE.ShapeGeometry(boidShape);
-const materialBoid = new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide });
-const defaultBoidMesh = new THREE.Mesh(geometry, materialBoid);
+// Load the drone model
+let defaultBoidMesh = null;
+
+// Return a promise so we can wait for the model to load
+const loadDroneModel = () => {
+    return new Promise((resolve, reject) => {
+        const loader = new STLLoader();
+        loader.load(
+            'models/drone.stl',
+            (geometry) => {
+                console.log('Drone model loaded successfully');
+
+                // Create a red material
+                const material = new THREE.MeshStandardMaterial({
+                    color: 0xff0000, // Red color
+                    metalness: 0.3,
+                    roughness: 0.7
+                });
+
+                // Create mesh from geometry
+                const droneMesh = new THREE.Mesh(geometry, material);
+
+                // Scale the drone to smaller size
+                droneMesh.scale.set(0.1, 0.1, 0.1);
+
+                defaultBoidMesh = droneMesh;
+                resolve(droneMesh);
+            },
+            (progress) => {
+                console.log('Loading drone model:', (progress.loaded / progress.total * 100).toFixed(2) + '%');
+            },
+            (error) => {
+                console.error('Error loading drone model:', error);
+                reject(error);
+            }
+        );
+    });
+};
+
+const droneModelPromise = loadDroneModel();
 
 export class Boid {
     constructor({
@@ -39,6 +69,8 @@ export class Boid {
         this.cubeSize = cubeSize;
         this.camera = camera;
         this.boidBehavior = boidBehavior;
+
+        // Clone the mesh
         this.mesh = boidMesh.clone();
 
         // Initialize with random velocity
@@ -118,9 +150,13 @@ export class Boid {
         this.pos.add(this.vel.clone().multiplyScalar(delta));
 
         // Orient mesh to face direction of movement
-        this.mesh.lookAt(this.pos.clone().add(this.vel));
-        this.mesh.rotateY(Math.PI / 2);
-        this.mesh.rotateZ(Math.PI / 2);
+        const targetPosition = this.pos.clone().add(this.vel.clone().normalize());
+        this.mesh.lookAt(targetPosition);
+        this.mesh.rotateX(-Math.PI / 2); // Tilt drone to fly forward
+
         this.mesh.position.copy(this.pos);
     }
 }
+
+// Export the promise and mesh for external use
+export { droneModelPromise, defaultBoidMesh };
