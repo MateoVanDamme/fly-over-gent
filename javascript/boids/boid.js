@@ -13,6 +13,12 @@ const loadDroneModel = () => {
             (geometry) => {
                 console.log('Drone model loaded successfully');
 
+                // Center the geometry so it rotates around its actual center
+                geometry.computeBoundingBox();
+                const center = new THREE.Vector3();
+                geometry.boundingBox.getCenter(center);
+                geometry.translate(-center.x, -center.y, -center.z);
+
                 // Create a red material
                 const material = new THREE.MeshStandardMaterial({
                     color: 0xff0000, // Red color
@@ -79,6 +85,9 @@ export class Boid {
             Math.random() - 0.5,
             Math.random() - 0.5
         );
+
+        // Track previous velocity for banking calculation
+        this.prevVel = this.vel.clone();
 
         // Start at random position above the floor, centered at (0, 0)
         this.pos = new THREE.Vector3(
@@ -149,12 +158,32 @@ export class Boid {
         // Update position
         this.pos.add(this.vel.clone().multiplyScalar(delta));
 
+        // Calculate banking angle based on turn rate
+        // Get the acceleration (change in velocity direction)
+        const acceleration = this.vel.clone().sub(this.prevVel);
+
+        // Project acceleration onto horizontal plane to get lateral turn component
+        const lateralAccel = new THREE.Vector3(acceleration.x, 0, acceleration.z);
+
+        // Calculate bank angle (roll) - proportional to lateral acceleration
+        // More aggressive turns = more bank
+        const bankAngle = lateralAccel.length() * 1.0; // Adjust multiplier for more/less banking
+
+        // Determine bank direction using cross product
+        const forward = this.vel.clone().normalize();
+        const lateralDir = new THREE.Vector3().crossVectors(forward, lateralAccel).y;
+        const bankSign = lateralDir > 0 ? 1 : -1;
+
         // Orient mesh to face direction of movement
-        const targetPosition = this.pos.clone().add(this.vel.clone().normalize());
+        const targetPosition = this.pos.clone().add(forward);
         this.mesh.lookAt(targetPosition);
         this.mesh.rotateX(-Math.PI / 2); // Tilt drone to fly forward
+        this.mesh.rotateY(bankAngle * bankSign); // Apply bank angle (roll)
 
         this.mesh.position.copy(this.pos);
+
+        // Store current velocity for next frame's banking calculation
+        this.prevVel.copy(this.vel);
     }
 }
 
