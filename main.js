@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import Stats from 'three/addons/libs/stats.module.js';
 import { loadSTLTiles } from './javascript/tileLoader.js';
+import { BoidManager } from './javascript/boids/boidManager.js';
 
-let camera, scene, renderer, stats;
+let camera, scene, renderer, stats, boidManager;
 
 const clock = new THREE.Clock();
 
@@ -47,6 +48,23 @@ function init() {
     const dirLight1 = new THREE.DirectionalLight(0xffffff, 2);
     dirLight1.position.set(1000, 1000, 1000);
     scene.add(dirLight1);
+
+    // Create boids (flying birds over the city)
+    boidManager = new BoidManager({
+        camera: camera,
+        amount: 100,
+        floorHeight: 80, // Keep boids above typical building height
+        boidBehavior: {
+            constantVel: 50,
+            centeringForce: 0.1 ,
+            gravity: 0.1,
+            attractForce: 1.0,
+            minDistance: 30,
+            avoidForce: 0.5,
+            conformDirection: 0.5
+        }
+    });
+    scene.add(boidManager);
 
     // Load STL tiles (tiles are centered around origin, so camera stays at 0,0,0)
     loadSTLTiles(
@@ -155,6 +173,11 @@ function animate() {
 
     controls(deltaTime);
     updatePlayer(deltaTime);
+
+    // Update boids
+    if (boidManager) {
+        boidManager.tick(deltaTime);
+    }
 
     render();
 

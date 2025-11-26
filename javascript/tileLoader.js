@@ -27,7 +27,7 @@ const terrainMaterial = new THREE.MeshLambertMaterial({
 terrainMaterial.onBeforeCompile = (shader) => {
     // Add uniform for cutoff height
     shader.uniforms.cutoffHeight = { value: 6.5 };
-    shader.uniforms.lowColor = { value: new THREE.Color(0x5577ff) };
+    shader.uniforms.lowColor = { value: new THREE.Color(0xaa0000) };
     shader.uniforms.highColor = { value: new THREE.Color(0xffffff) };
 
     // Add varying to pass height from vertex to fragment shader
@@ -88,29 +88,30 @@ export function loadSTLTiles(scene, onProgress, onComplete, onError) {
 
     // Building STL files to load
     const buildingFiles = [
-        dataPath + 'stl/ACAD-Geb_103000_192000_10_2_N_2013.stl',
-        dataPath + 'stl/ACAD-Geb_103000_193000_10_2_N_2013.stl',
-        dataPath + 'stl/ACAD-Geb_103000_194000_10_2_N_2013.stl',
-        dataPath + 'stl/ACAD-Geb_104000_192000_10_2_N_2013.stl',
+        // dataPath + 'stl/ACAD-Geb_103000_192000_10_2_N_2013.stl',
+        // dataPath + 'stl/ACAD-Geb_103000_193000_10_2_N_2013.stl',
+        // dataPath + 'stl/ACAD-Geb_103000_194000_10_2_N_2013.stl',
+        // dataPath + 'stl/ACAD-Geb_104000_192000_10_2_N_2013.stl',
         dataPath + 'stl/ACAD-Geb_104000_193000_10_2_N_2013.stl',
         dataPath + 'stl/ACAD-Geb_104000_194000_10_2_N_2013.stl',
-        dataPath + 'stl/ACAD-Geb_105000_192000_10_2_N_2013.stl',
+        // dataPath + 'stl/ACAD-Geb_105000_192000_10_2_N_2013.stl',
         dataPath + 'stl/ACAD-Geb_105000_193000_10_2_N_2013.stl',
         dataPath + 'stl/ACAD-Geb_105000_194000_10_2_N_2013.stl'
     ];
 
     // Terrain STL files to load
     const terrainFiles = [
-        dataPath + 'stl/ACAD-Trn_103000_192000_10_0_N_2013.stl',
-        dataPath + 'stl/ACAD-Trn_103000_193000_10_0_N_2013.stl',
-        dataPath + 'stl/ACAD-Trn_103000_194000_10_0_N_2013.stl',
-        dataPath + 'stl/ACAD-Trn_104000_192000_10_0_N_2013.stl',
+        // dataPath + 'stl/ACAD-Trn_103000_192000_10_0_N_2013.stl',
+        // dataPath + 'stl/ACAD-Trn_103000_193000_10_0_N_2013.stl',
+        // dataPath + 'stl/ACAD-Trn_103000_194000_10_0_N_2013.stl',
+        // dataPath + 'stl/ACAD-Trn_104000_192000_10_0_N_2013.stl',
         dataPath + 'stl/ACAD-Trn_104000_193000_10_0_N_2013.stl',
         dataPath + 'stl/ACAD-Trn_104000_194000_10_0_N_2013.stl',
-        dataPath + 'stl/ACAD-Trn_105000_192000_10_0_N_2013.stl',
+        // dataPath + 'stl/ACAD-Trn_105000_192000_10_0_N_2013.stl',
         dataPath + 'stl/ACAD-Trn_105000_193000_10_0_N_2013.stl',
         dataPath + 'stl/ACAD-Trn_105000_194000_10_0_N_2013.stl'
     ];
+
 
     // Parse coordinates from all files
     const allFiles = [...buildingFiles, ...terrainFiles];
