@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import Stats from 'three/addons/libs/stats.module.js';
+import { GUI } from 'lil-gui';
 import { loadSTLTiles } from './javascript/tileLoader.js';
 import { BoidManager } from './javascript/boids/boidManager.js';
 
-let camera, scene, renderer, stats, boidManager;
+let camera, scene, renderer, stats, boidManager, gui;
 
 const clock = new THREE.Clock();
 
@@ -21,6 +22,9 @@ const cameraSystem = {
 };
 
 const keyStates = {};
+
+// Debug visibility state
+let debugVisible = true;
 
 init();
 
@@ -41,6 +45,7 @@ function init() {
 
     // Stats
     stats = new Stats();
+    stats.dom.classList.add('debug-info');
     document.body.appendChild(stats.dom);
 
     // Camera setup - positioned at center since tiles are centered around origin
@@ -56,25 +61,44 @@ function init() {
     dirLight1.position.set(1000, 1000, 1000);
     scene.add(dirLight1);
 
-    // Create boids (flying birds over the city)
-    boidManager = new BoidManager({
-        camera: camera,
+    // Boid configuration object
+    const boidConfig = {
         amount: 100,
         floorHeight: 180,
         maxRadius: 500,
+        constantVel: 50,
+        boundaryForce: 0.1,
+        gravity: 0.5,
+        attractForce: 0.6,
+        avoidForce: 1.5,
+        targetDistance: 40,
+        maxAttractionDistance: 150,
+        alignmentForce: 0.2,
+        levelingForce: 0.001
+    };
+
+    // Create boids
+    boidManager = new BoidManager({
+        camera: camera,
+        amount: boidConfig.amount,
+        floorHeight: boidConfig.floorHeight,
+        maxRadius: boidConfig.maxRadius,
         boidBehavior: {
-            constantVel: 50,
-            boundaryForce: 0.1,
-            gravity: 0.5,
-            attractForce: 0.6,
-            avoidForce: 1.5,
-            targetDistance: 40,
-            maxAttractionDistance: 150,
-            alignmentForce: 0.2,
-            levelingForce: 0.001
+            constantVel: boidConfig.constantVel,
+            boundaryForce: boidConfig.boundaryForce,
+            gravity: boidConfig.gravity,
+            attractForce: boidConfig.attractForce,
+            avoidForce: boidConfig.avoidForce,
+            targetDistance: boidConfig.targetDistance,
+            maxAttractionDistance: boidConfig.maxAttractionDistance,
+            alignmentForce: boidConfig.alignmentForce,
+            levelingForce: boidConfig.levelingForce
         }
     });
     scene.add(boidManager);
+
+    // Setup GUI
+    setupGUI(boidConfig);
 
     // Load STL tiles (tiles are centered around origin, so camera stays at 0,0,0)
     loadSTLTiles(
@@ -106,33 +130,29 @@ function init() {
         keyStates[event.code] = false;
     });
 
-    // Camera mode switching
+    // Camera mode switching and debug toggle
     document.addEventListener('keydown', (event) => {
-        const modeDisplay = document.getElementById('current-mode');
-
         if (event.code === 'Digit1') {
             cameraSystem.mode = 'follow';
-            modeDisplay.textContent = 'Follow';
             console.log('Camera Mode: Follow (behind boid)');
         } else if (event.code === 'Digit2') {
             cameraSystem.mode = 'chase';
-            modeDisplay.textContent = 'Chase';
             console.log('Camera Mode: Chase (close follow)');
         } else if (event.code === 'Digit3') {
             cameraSystem.mode = 'orbit';
-            modeDisplay.textContent = 'Orbit';
             console.log('Camera Mode: Orbit (circular around flock)');
         } else if (event.code === 'Digit4') {
             cameraSystem.mode = 'manual';
-            modeDisplay.textContent = 'Manual';
             console.log('Camera Mode: Manual (free control)');
         } else if (event.code === 'Tab') {
             event.preventDefault();
-            // Switch to next boid
             if (boidManager && boidManager.boids.length > 0) {
                 cameraSystem.currentBoidIndex = (cameraSystem.currentBoidIndex + 1) % boidManager.boids.length;
                 console.log(`Following boid ${cameraSystem.currentBoidIndex + 1}/${boidManager.boids.length}`);
             }
+        } else if (event.code === 'KeyD') {
+            debugVisible = !debugVisible;
+            toggleDebugInfo();
         }
     });
 
@@ -149,6 +169,74 @@ function init() {
         }
     });
 
+}
+
+function setupGUI(boidConfig) {
+    gui = new GUI();
+    gui.domElement.classList.add('debug-info');
+
+    // Camera controls
+    const cameraFolder = gui.addFolder('Camera');
+    cameraFolder.add(cameraSystem, 'mode', ['follow', 'chase', 'orbit', 'manual']).name('Mode');
+    cameraFolder.add(cameraSystem, 'smoothness', 0.01, 0.2, 0.01).name('Smoothness');
+    cameraFolder.add(cameraSystem, 'lookAhead', 0, 200, 10).name('Look Ahead');
+    cameraFolder.open();
+
+    // Boid behavior controls
+    const boidFolder = gui.addFolder('Boid Behavior');
+    boidFolder.add(boidConfig, 'constantVel', 10, 100, 1).name('Speed').onChange(updateBoidBehavior);
+    boidFolder.add(boidConfig, 'gravity', 0, 2, 0.01).name('Gravity').onChange(updateBoidBehavior);
+    boidFolder.add(boidConfig, 'attractForce', 0, 2, 0.1).name('Cohesion').onChange(updateBoidBehavior);
+    boidFolder.add(boidConfig, 'avoidForce', 0, 5, 0.1).name('Separation').onChange(updateBoidBehavior);
+    boidFolder.add(boidConfig, 'alignmentForce', 0, 1, 0.01).name('Alignment').onChange(updateBoidBehavior);
+    boidFolder.add(boidConfig, 'targetDistance', 10, 100, 5).name('Target Spacing').onChange(updateBoidBehavior);
+    boidFolder.add(boidConfig, 'maxAttractionDistance', 50, 300, 10).name('Interaction Range').onChange(updateBoidBehavior);
+    boidFolder.add(boidConfig, 'levelingForce', 0, 0.1, 0.001).name('Leveling').onChange(updateBoidBehavior);
+    boidFolder.open();
+
+    // Boundary controls
+    const boundaryFolder = gui.addFolder('Boundaries');
+    boundaryFolder.add(boidConfig, 'floorHeight', 50, 300, 10).name('Floor Height').onChange(updateBoundaries);
+    boundaryFolder.add(boidConfig, 'maxRadius', 200, 1000, 50).name('Max Radius').onChange(updateBoundaries);
+    boundaryFolder.add(boidConfig, 'boundaryForce', 0, 1, 0.05).name('Boundary Force').onChange(updateBoidBehavior);
+    boundaryFolder.open();
+
+    function updateBoidBehavior() {
+        if (boidManager && boidManager.boids) {
+            boidManager.boids.forEach(boid => {
+                boid.boidBehavior.constantVel = boidConfig.constantVel;
+                boid.boidBehavior.boundaryForce = boidConfig.boundaryForce;
+                boid.boidBehavior.gravity = boidConfig.gravity;
+                boid.boidBehavior.attractForce = boidConfig.attractForce;
+                boid.boidBehavior.avoidForce = boidConfig.avoidForce;
+                boid.boidBehavior.targetDistance = boidConfig.targetDistance;
+                boid.boidBehavior.maxAttractionDistance = boidConfig.maxAttractionDistance;
+                boid.boidBehavior.alignmentForce = boidConfig.alignmentForce;
+                boid.boidBehavior.levelingForce = boidConfig.levelingForce;
+            });
+        }
+    }
+
+    function updateBoundaries() {
+        if (boidManager && boidManager.boids) {
+            boidManager.floorHeight = boidConfig.floorHeight;
+            boidManager.maxRadius = boidConfig.maxRadius;
+            boidManager.boids.forEach(boid => {
+                boid.floorHeight = boidConfig.floorHeight;
+                boid.maxRadius = boidConfig.maxRadius;
+            });
+        }
+    }
+}
+
+function toggleDebugInfo() {
+    if (debugVisible) {
+        stats.dom.style.display = 'block';
+        gui.domElement.style.display = 'block';
+    } else {
+        stats.dom.style.display = 'none';
+        gui.domElement.style.display = 'none';
+    }
 }
 
 function onWindowResize() {
