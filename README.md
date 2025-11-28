@@ -1,18 +1,28 @@
 # Fly Over Gent
 
-Interactive 3D viewer for flying through the city of Gent using real city data.
+Interactive 3D viewer for flying through the city of Gent using real city data, featuring autonomous boid flocking simulation with cinematic camera modes.
 
-The site is live at: https://mateovandamme.github.io/fly-over-gent/
+**Live Demo:** https://flyover.mateovandamme.com/
 
 ## Features
 
-- First-person flight controls with mouse look
-- Real 3D city models from official city data
-- Lambert-1972 coordinate system positioning
-- Smooth movement with WASD controls
+- **Boid Flocking System**: Autonomous flying drones using boid algorithms (separation, alignment, cohesion)
+- **Cinematic Camera Modes**: Follow, chase, orbit, and manual control modes
+- **Real 3D City Models**: Official city data from Gent
+- **Interactive Controls**: Adjust boid behavior in real-time with GUI
+- **Lambert-1972 Coordinate System**: Accurate geographic positioning
 
 ## Controls
 
+### Camera Modes
+- **1** - Follow mode (camera behind and above boid)
+- **2** - Chase mode (close pursuit camera)
+- **3** - Orbit mode (circular around flock)
+- **4** - Manual mode (free flight)
+- **Tab** - Switch to next boid
+- **D** - Toggle debug info (GUI + stats)
+
+### Manual Mode Controls
 - **Click** to capture mouse
 - **Mouse** to look around
 - **WASD** to move
