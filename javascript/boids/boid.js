@@ -19,9 +19,8 @@ const loadDroneModel = () => {
                 geometry.boundingBox.getCenter(center);
                 geometry.translate(-center.x, -center.y, -center.z);
 
-                // Create a red material
                 const material = new THREE.MeshStandardMaterial({
-                    color: 0xff0000, // Red color
+                    color: 0xff0000,
                     metalness: 0.3,
                     roughness: 0.7
                 });
@@ -48,32 +47,39 @@ const loadDroneModel = () => {
 
 const droneModelPromise = loadDroneModel();
 
+/**
+ * Boid class - represents a single flying entity in the flock simulation.
+ *
+ * Boid behavior parameters:
+ * - constantVel: Target velocity magnitude (speed) in units/second
+ * - boundaryForce: Strength of push away from boundaries (floor and radius cylinder)
+ * - gravity: Downward acceleration applied each frame
+ * - attractForce: Pull toward nearby boids (cohesion)
+ * - avoidForce: Push away from boids too close (separation)
+ * - targetDistance: Ideal spacing between boids
+ * - maxAttractionDistance: Only attract to boids within this range
+ * - alignmentForce: Match neighbors' flight direction (alignment)
+ * - levelingForce: Tendency to fly horizontally (0-1, dampens vertical velocity)
+ */
 export class Boid {
     constructor({
-        cubeSize,
         floorHeight,
-        camera,
+        maxRadius,
         boidMesh = defaultBoidMesh,
         boidBehavior = {
             constantVel: 50,
-            centeringForce: 0.1,
+            boundaryForce: 0.1,
             gravity: 0.005,
             attractForce: 2.0,
-            minDistance: 30,
+            targetDistance: 30,
+            maxAttractionDistance: 100,
             avoidForce: 0.5,
-            conformDirection: 0.05
+            alignmentForce: 0.05,
+            levelingForce: 0.1
         }
     }) {
-        if (typeof (cubeSize) === 'undefined' && typeof (floorHeight) !== 'undefined')
-            this.floorMode = true;
-        else if (typeof (cubeSize) !== 'undefined' && typeof (floorHeight) === 'undefined')
-            this.floorMode = false;
-        else
-            throw new Error('Either specify a cube for the boids to fly in OR a minimum floor');
-
         this.floorHeight = floorHeight;
-        this.cubeSize = cubeSize;
-        this.camera = camera;
+        this.maxRadius = maxRadius;
         this.boidBehavior = boidBehavior;
 
         // Clone the mesh
@@ -102,55 +108,63 @@ export class Boid {
         return this.mesh;
     }
 
-    update(boids, center, boidid, delta) {
+    update(boids, boidid, delta) {
         let push = new THREE.Vector3();
 
-        // Boundary constraints
-        if (this.floorMode) {
-            // Pull boids back toward city center (0, 0) - force increases with distance
-            const distanceFromCenter = Math.sqrt(this.pos.x * this.pos.x + this.pos.z * this.pos.z);
-            const pullStrength = distanceFromCenter / 1000; // Stronger pull the further away
-            push.x = -this.pos.x * pullStrength;
-            push.z = -this.pos.z * pullStrength;
+        // Boundary forces: floor and radius cylinder
+        const boundaryPush = new THREE.Vector3();
 
-            // Strong force to stay above floor
-            push.y = Math.max(0, this.floorHeight - this.pos.y);
-        } else {
-            // Cube mode boundaries
-            push.x = Math.min(0, this.cubeSize / 2 - this.pos.x) + Math.max(0, -this.pos.x - this.cubeSize / 2);
-            push.y = Math.min(0, this.cubeSize / 2 - this.pos.y) + Math.max(0, -this.pos.y - this.cubeSize / 2);
-            push.z = Math.min(0, this.cubeSize / 2 - this.pos.z) + Math.max(0, -this.pos.z - this.cubeSize / 2);
+        // Floor boundary: push up when below floor
+        const floorDistance = this.floorHeight - this.pos.y;
+        boundaryPush.y = Math.max(0, floorDistance * 0.3);
+
+        // Radius boundary: push inward when outside radius (horizontal only)
+        const distanceFromCenter = Math.sqrt(this.pos.x * this.pos.x + this.pos.z * this.pos.z);
+        const radiusDistance = distanceFromCenter - this.maxRadius;
+        if (radiusDistance > 0) {
+            // Outside radius - push toward center
+            const pushDirection = new THREE.Vector3(-this.pos.x, 0, -this.pos.z).normalize();
+            boundaryPush.x = pushDirection.x * radiusDistance * 0.3;
+            boundaryPush.z = pushDirection.z * radiusDistance * 0.3;
         }
-        this.vel.add(push.multiplyScalar(this.boidBehavior.centeringForce));
 
-        // Separation and alignment with nearby boids
+        this.vel.add(boundaryPush.multiplyScalar(this.boidBehavior.boundaryForce));
+
+        // Boid interactions: separation, alignment, and cohesion
         for (let i = 0; i < boids.length; i++) {
             if (i !== boidid) {
                 let dist = this.pos.distanceTo(boids[i].pos);
-                if (dist < this.boidBehavior.minDistance) {
-                    // Separation: avoid crowding
-                    push.x = this.pos.x - boids[i].pos.x;
-                    push.y = this.pos.y - boids[i].pos.y;
-                    push.z = this.pos.z - boids[i].pos.z;
-                    push.normalize().multiplyScalar(this.boidBehavior.avoidForce).divideScalar(dist + 0.00001);
-                    this.vel.add(push);
 
-                    // Alignment: match neighbors' direction
-                    push.copy(boids[i].vel).normalize().multiplyScalar(this.boidBehavior.conformDirection).divideScalar(dist + 0.00001);
+                // Only interact with nearby boids (within max attraction distance)
+                if (dist < this.boidBehavior.maxAttractionDistance) {
+                    if (dist < this.boidBehavior.targetDistance) {
+                        // Too close: Separation (push away)
+                        push.x = this.pos.x - boids[i].pos.x;
+                        push.y = this.pos.y - boids[i].pos.y;
+                        push.z = this.pos.z - boids[i].pos.z;
+                        push.normalize().multiplyScalar(this.boidBehavior.avoidForce).divideScalar(dist + 0.00001);
+                        this.vel.add(push);
+                    } else {
+                        // Too far but still nearby: Cohesion (pull together)
+                        push.x = boids[i].pos.x - this.pos.x;
+                        push.y = boids[i].pos.y - this.pos.y;
+                        push.z = boids[i].pos.z - this.pos.z;
+                        push.normalize().multiplyScalar(this.boidBehavior.attractForce).divideScalar(dist + 0.00001);
+                        this.vel.add(push);
+                    }
+
+                    // Alignment: match neighbors' direction (only for nearby boids)
+                    push.copy(boids[i].vel).normalize().multiplyScalar(this.boidBehavior.alignmentForce).divideScalar(dist + 0.00001);
                     this.vel.add(push);
                 }
             }
         }
 
-        // Cohesion: move toward center of flock
-        push.x = center.x - this.pos.x;
-        push.y = center.y - this.pos.y;
-        push.z = center.z - this.pos.z;
-        push.normalize();
-        this.vel.add(push.multiplyScalar(this.boidBehavior.attractForce));
-
         // Apply gravity
         this.vel.y -= this.boidBehavior.gravity;
+
+        // Leveling force: dampen vertical velocity to encourage horizontal flight
+        this.vel.y *= (1.0 - this.boidBehavior.levelingForce);
 
         // Maintain constant speed
         this.vel.normalize().multiplyScalar(this.boidBehavior.constantVel);
@@ -166,8 +180,7 @@ export class Boid {
         const lateralAccel = new THREE.Vector3(acceleration.x, 0, acceleration.z);
 
         // Calculate bank angle (roll) - proportional to lateral acceleration
-        // More aggressive turns = more bank
-        const bankAngle = lateralAccel.length() * 1.0; // Adjust multiplier for more/less banking
+        const bankAngle = lateralAccel.length() * 1.0;
 
         // Determine bank direction using cross product
         const forward = this.vel.clone().normalize();

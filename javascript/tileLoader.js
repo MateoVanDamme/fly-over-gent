@@ -27,7 +27,7 @@ const terrainMaterial = new THREE.MeshLambertMaterial({
 terrainMaterial.onBeforeCompile = (shader) => {
     // Add uniform for cutoff height
     shader.uniforms.cutoffHeight = { value: 6.5 };
-    shader.uniforms.lowColor = { value: new THREE.Color(0xaa0000) };
+    shader.uniforms.lowColor = { value: new THREE.Color(0xcc0000) };
     shader.uniforms.highColor = { value: new THREE.Color(0xffffff) };
 
     // Add varying to pass height from vertex to fragment shader

@@ -60,15 +60,18 @@ function init() {
     boidManager = new BoidManager({
         camera: camera,
         amount: 100,
-        floorHeight: 80, // Keep boids above typical building height
+        floorHeight: 180,
+        maxRadius: 500,
         boidBehavior: {
             constantVel: 50,
-            centeringForce: 0.1 ,
-            gravity: 0.1,
-            attractForce: 0.3,
-            minDistance: 30,
-            avoidForce: 0.5,
-            conformDirection: 0.4
+            boundaryForce: 0.1,
+            gravity: 0.5,
+            attractForce: 0.6,
+            avoidForce: 1.5,
+            targetDistance: 40,
+            maxAttractionDistance: 150,
+            alignmentForce: 0.2,
+            levelingForce: 0.001
         }
     });
     scene.add(boidManager);
@@ -207,7 +210,12 @@ function updateCinematicCamera(deltaTime) {
 
     } else if (cameraSystem.mode === 'orbit') {
         // Orbit mode: camera orbits around the center of the flock
-        const center = boidManager.calculateCentroid();
+        // Calculate centroid of all boids
+        const center = new THREE.Vector3();
+        for (let i = 0; i < boidManager.boids.length; i++) {
+            center.add(boidManager.boids[i].pos);
+        }
+        center.divideScalar(boidManager.boids.length);
 
         // Circular orbit
         const radius = 200;
