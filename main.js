@@ -150,7 +150,7 @@ function init() {
                 cameraSystem.currentBoidIndex = (cameraSystem.currentBoidIndex + 1) % boidManager.boids.length;
                 console.log(`Following boid ${cameraSystem.currentBoidIndex + 1}/${boidManager.boids.length}`);
             }
-        } else if (event.code === 'KeyD') {
+        } else if (event.code === 'KeyI') {
             debugVisible = !debugVisible;
             toggleDebugInfo();
         }
