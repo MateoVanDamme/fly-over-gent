@@ -8,6 +8,10 @@ let camera, scene, renderer, stats, boidManager, gui;
 
 const clock = new THREE.Clock();
 
+// Auto-respawn timer
+const AUTO_RESPAWN_INTERVAL = 2 * 60 * 1000; // 2 minutes in milliseconds
+let lastRespawnTime = Date.now();
+
 // Rendering constants
 const MAX_RENDER_DISTANCE = 4000; // Maximum view distance in meters
 
@@ -370,6 +374,15 @@ function updateCinematicCamera(deltaTime) {
 function animate() {
 
     const deltaTime = Math.min(0.05, clock.getDelta());
+
+    // Check if it's time to auto-respawn
+    const currentTime = Date.now();
+    if (currentTime - lastRespawnTime >= AUTO_RESPAWN_INTERVAL) {
+        if (boidManager) {
+            boidManager.respawnBoids();
+            lastRespawnTime = currentTime;
+        }
+    }
 
     // Update boids
     if (boidManager) {
