@@ -153,6 +153,10 @@ function init() {
         } else if (event.code === 'KeyI') {
             debugVisible = !debugVisible;
             toggleDebugInfo();
+        } else if (event.code === 'KeyP') {
+            if (boidManager) {
+                boidManager.respawnBoids();
+            }
         }
     });
 

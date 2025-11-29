@@ -47,4 +47,33 @@ export class BoidManager extends THREE.Group {
             this.boids[i].update(this.boids, i, delta);
         }
     }
+
+    respawnBoids() {
+        // Reset all boids to random initial positions and velocities
+        for (let i = 0; i < this.boids.length; i++) {
+            const boid = this.boids[i];
+
+            // Reset position to random starting position
+            boid.pos.set(
+                (Math.random() - 0.5) * 200,
+                this.floorHeight + Math.random() * 100 + 50,
+                (Math.random() - 0.5) * 200
+            );
+
+            // Reset velocity to random direction
+            boid.vel.set(
+                Math.random() - 0.5,
+                Math.random() - 0.5,
+                Math.random() - 0.5
+            );
+
+            // Reset previous velocity
+            boid.prevVel.copy(boid.vel);
+
+            // Update mesh position
+            boid.mesh.position.copy(boid.pos);
+        }
+
+        console.log('Boids respawned');
+    }
 }
