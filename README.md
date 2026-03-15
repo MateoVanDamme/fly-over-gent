@@ -1,33 +1,21 @@
-# Fly Over Gent
+# Fly Over Ghent
 
-Interactive 3D viewer for flying through the city of Gent using real city data, featuring autonomous boid flocking simulation with cinematic camera modes.
-
-**Live Demo:** https://flyover.mateovandamme.com/
+Interactive 3D viewer for flying through the city of Ghent using real city data.
 
 ## Features
 
-- **Boid Flocking System**: Autonomous flying drones using boid algorithms (separation, alignment, cohesion)
-- **Cinematic Camera Modes**: Follow, chase, orbit, and manual control modes
+- **Free Flight**: Fly freely through the 3D city
 - **Real 3D City Models**: Official city data from Gent
-- **Interactive Controls**: Adjust boid behavior in real-time with GUI
 - **Lambert-1972 Coordinate System**: Accurate geographic positioning
 
 ## Controls
 
-### Camera Modes
-- **1** - Follow mode (camera behind and above boid)
-- **2** - Chase mode (close pursuit camera)
-- **3** - Orbit mode (circular around flock)
-- **4** - Manual mode (free flight)
-- **Tab** - Switch to next boid
-- **D** - Toggle debug info (GUI + stats)
-
-### Manual Mode Controls
 - **Click** to capture mouse
 - **Mouse** to look around
 - **WASD** to move
 - **Space** to fly up
 - **Shift** to fly down
+- **I** - Toggle debug info
 - **ESC** to release mouse
 
 ## Data Source & License
@@ -69,7 +57,7 @@ pip install ezdxf numpy numpy-stl requests
 **Single File Conversion:**
 
 1. **Convert DWG to DXF** (requires AutoCAD on Windows):
-   Enter AutoCAD and do DXFOUT manually. 
+   Enter AutoCAD and do DXFOUT manually.
 
 2. **Inspect DXF** (optional - to verify geometry):
    ```bash
