@@ -16,6 +16,8 @@ export const ORIGIN_Y = 193000;
 const loadedTiles = new Map();
 // Track tiles currently being loaded to avoid duplicate requests
 const loadingTiles = new Set();
+// Cache last tile coord to skip redundant updateChunks calls
+let lastCameraTileKey = '';
 
 const loader = new STLLoader();
 
@@ -190,8 +192,10 @@ function unloadTile(key) {
  */
 export function updateChunks(scene, cameraPosition) {
     const cameraTile = getCameraTile(cameraPosition);
+    const cameraTileKey = `${cameraTile.x}_${cameraTile.y}`;
+    if (cameraTileKey === lastCameraTileKey) return;
+    lastCameraTileKey = cameraTileKey;
 
-    // Build set of desired tile keys (3x3 grid)
     const desired = new Set();
     for (let dx = -VIEW_DISTANCE; dx <= VIEW_DISTANCE; dx++) {
         for (let dy = -VIEW_DISTANCE; dy <= VIEW_DISTANCE; dy++) {
