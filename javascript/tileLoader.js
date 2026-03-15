@@ -4,6 +4,7 @@ import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 // Data source configuration
 export const USE_ONLINE_DATA = false;
 export const ONLINE_DATA_BASE = 'https://storage.googleapis.com/fly-over-ghent/';
+const EDGES_ENABLED = false;
 
 // Tile system constants
 const TILE_SIZE = 1000;
@@ -103,12 +104,14 @@ function loadSTL(url, material, isTerrain, tileX, tileY) {
 
                 const mesh = new THREE.Mesh(geometry, material);
 
-                const edgeThreshold = isTerrain ? 1 : 10;
-                const edgeColor = isTerrain ? 0x999999 : 0x000000;
-                const edges = new THREE.EdgesGeometry(geometry, edgeThreshold);
-                const lineMaterial = new THREE.LineBasicMaterial({ color: edgeColor, linewidth: 1 });
-                const edgeLines = new THREE.LineSegments(edges, lineMaterial);
-                mesh.add(edgeLines);
+                if (EDGES_ENABLED) {
+                    const edgeThreshold = isTerrain ? 1 : 10;
+                    const edgeColor = isTerrain ? 0x999999 : 0x000000;
+                    const edges = new THREE.EdgesGeometry(geometry, edgeThreshold);
+                    const lineMaterial = new THREE.LineBasicMaterial({ color: edgeColor, linewidth: 1 });
+                    const edgeLines = new THREE.LineSegments(edges, lineMaterial);
+                    mesh.add(edgeLines);
+                }
 
                 resolve(mesh);
             },
