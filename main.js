@@ -89,6 +89,7 @@ function init() {
 
     document.body.addEventListener('mousemove', (event) => {
         if (document.pointerLockElement === document.body) {
+            if (Math.abs(event.movementX) > 200 || Math.abs(event.movementY) > 200) return;
             camera.rotation.y -= event.movementX / 500;
             camera.rotation.x -= event.movementY / 500;
         }
