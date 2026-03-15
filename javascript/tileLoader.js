@@ -8,6 +8,7 @@ const EDGES_ENABLED = false;
 
 // Tile system constants
 const TILE_SIZE = 1000;
+const VIEW_DISTANCE = 2; // tiles in each direction (2 = 5x5 grid)
 export const ORIGIN_X = 104000;
 export const ORIGIN_Y = 193000;
 
@@ -192,8 +193,8 @@ export function updateChunks(scene, cameraPosition) {
 
     // Build set of desired tile keys (3x3 grid)
     const desired = new Set();
-    for (let dx = -1; dx <= 1; dx++) {
-        for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -VIEW_DISTANCE; dx <= VIEW_DISTANCE; dx++) {
+        for (let dy = -VIEW_DISTANCE; dy <= VIEW_DISTANCE; dy++) {
             const tx = cameraTile.x + dx * TILE_SIZE;
             const ty = cameraTile.y + dy * TILE_SIZE;
             desired.add(`${tx}_${ty}`);
