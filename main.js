@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import Stats from 'three/addons/libs/stats.module.js';
-import { loadSTLTiles } from './javascript/tileLoader.js';
+import { updateChunks } from './javascript/tileLoader.js';
 
 let camera, scene, renderer, stats;
 
@@ -39,7 +39,7 @@ function init() {
     // Camera setup
     camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, MAX_RENDER_DISTANCE);
     camera.rotation.order = 'YXZ';
-    camera.position.set(0, 100, 0);
+    camera.position.set(500, 100, -500);
 
     // Lights
     const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
@@ -49,20 +49,8 @@ function init() {
     dirLight1.position.set(1000, 1000, 1000);
     scene.add(dirLight1);
 
-    // Load STL tiles
-    loadSTLTiles(
-        scene,
-        (loadedCount, totalTiles, filename) => {
-            const tileName = filename.split('/').pop();
-            console.log(`Loading tiles: ${loadedCount}/${totalTiles} - ${tileName}`);
-        },
-        () => {
-            document.getElementById('loading').style.display = 'none';
-        },
-        (filename, error) => {
-            document.getElementById('loading').textContent = `Error loading ${filename}`;
-        }
-    );
+    // Hide loading indicator (chunks load dynamically)
+    document.getElementById('loading').style.display = 'none';
 
     // Window resize handler
     window.addEventListener('resize', onWindowResize);
@@ -150,6 +138,7 @@ function updateCamera(deltaTime) {
 function animate() {
     const deltaTime = Math.min(0.05, clock.getDelta());
     updateCamera(deltaTime);
+    updateChunks(scene, camera.position);
     renderer.render(scene, camera);
     stats.update();
 }
