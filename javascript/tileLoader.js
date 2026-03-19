@@ -87,8 +87,8 @@ function getTilePaths(tileX, tileY) {
     const dataPath = USE_ONLINE_DATA ? ONLINE_DATA_BASE : 'data/';
     const coord = `${tileX}_${tileY}`;
     return {
-        building: dataPath + `stl/ACAD-Geb_${coord}_10_2_N_2013.stl`,
-        terrain: dataPath + `stl/ACAD-Trn_${coord}_10_0_N_2013.stl`
+        building: dataPath + `stl/Geb_${coord}_10_2_N_2013.stl`,
+        terrain: dataPath + `stl/Trn_${coord}_10_0_N_2013.stl`
     };
 }
 

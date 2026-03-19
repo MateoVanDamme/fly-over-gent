@@ -47,58 +47,38 @@ The `pre-processing/` directory contains Python scripts to convert DWG files to 
 #### Requirements
 
 ```bash
-pip install ezdxf numpy numpy-stl requests
+pip install ezdxf numpy trimesh requests
 ```
 
-**Note:** DWG to DXF conversion requires AutoCAD installed on Windows with `pyautocad`.
+**Note:** DWG reading requires the free [ODA File Converter](https://www.opendesign.com/guestfiles/oda_file_converter) (~30MB). Install to default location; ezdxf auto-detects it.
 
 #### Workflow
 
 **Single File Conversion:**
 
-1. **Convert DWG to DXF** (requires AutoCAD on Windows):
-   Enter AutoCAD and do DXFOUT manually.
-
-2. **Inspect DXF** (optional - to verify geometry):
-   ```bash
-   python pre-processing/inspect_dwg.py <output.dxf>
-   ```
-   Shows entity counts and types in the DXF file.
-
-3. **Convert DXF to STL**:
-   ```bash
-   python pre-processing/dxf_to_stl_3dface.py <output.dxf>
-   ```
-   Converts 3DFACE entities and POLYLINE meshes to STL format.
+```bash
+python pre-processing/dwg_to_stl.py <input.dwg|dxf> [output.stl]
+```
+Converts DWG/DXF files (3DFACE entities and POLYLINE meshes) directly to STL format.
 
 **Batch Conversion:**
 
-Convert all DXF files in a directory using parallel processing:
-
 ```bash
-# Convert all DXF files to a specific output directory
-python pre-processing/batch_dxf_to_stl.py data/ --output data/stl
+# Convert all DWG files
+python pre-processing/run_all.py
 
-# Convert only terrain files
-python pre-processing/batch_dxf_to_stl.py data/ --pattern "*Trn_*.dxf" --output data/stl
+# Skip already converted files
+python pre-processing/run_all.py --skip-existing
 
-# Skip files that already have STL outputs
-python pre-processing/batch_dxf_to_stl.py data/ --skip-existing --output data/stl
+# Download data first, then convert
+python pre-processing/run_all.py --download
 
-# Use specific number of workers
-python pre-processing/batch_dxf_to_stl.py data/ --workers 4 --output data/stl
+# Only terrain or building files
+python pre-processing/run_all.py --pattern "*Trn_*"
+python pre-processing/run_all.py --pattern "*Geb_*"
 ```
 
-**Windows Example:**
-```cmd
-python pre-processing\batch_dxf_to_stl.py "C:\Repos\home\fly-over-gent\data" --output "C:\Repos\home\fly-over-gent\data\stl" --skip-existing
-```
-
-This command will:
-- Search recursively for all DXF files in the `data` directory
-- Convert them to STL format using parallel processing
-- Output all STL files to `data\stl\`
-- Skip files that are already converted (saves time on subsequent runs)
+Scans `data/input/` for DWG files and outputs to `data/stl/`. For custom directories use `batch_convert.py` directly.
 
 #### Output Format
 

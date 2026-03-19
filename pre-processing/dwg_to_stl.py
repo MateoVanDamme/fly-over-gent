@@ -1,5 +1,6 @@
 """
-Convert DXF to STL - Extract 3DFACE entities directly
+Convert DWG/DXF to STL - Extract 3DFACE entities directly
+Supports DWG files via ODA File Converter (ezdxf.addons.odafc)
 Works around FreeCAD's complaints about "malformed" 3DFACE entities
 """
 
@@ -16,34 +17,74 @@ except ImportError:
     sys.exit(1)
 
 
-def dxf_to_stl_3dface(dxf_path, stl_path=None):
+def read_cad_file(file_path):
     """
-    Convert DXF file to STL by extracting 3DFACE entities
-    Ignores malformed faces and only uses valid ones
+    Read a DWG or DXF file and return an ezdxf document.
+    DWG files are converted transparently via ODA File Converter.
     """
-    dxf_path = Path(dxf_path)
+    file_path = Path(file_path)
+    suffix = file_path.suffix.lower()
 
-    if not dxf_path.exists():
-        raise FileNotFoundError(f"DXF file not found: {dxf_path}")
+    if suffix == '.dwg':
+        try:
+            from ezdxf.addons import odafc
+        except ImportError:
+            raise RuntimeError("ezdxf.addons.odafc not available. Update ezdxf: pip install -U ezdxf")
+
+        # Auto-detect ODA in versioned install directories (e.g. "ODAFileConverter 27.1.0")
+        if not odafc.is_installed():
+            import glob as _glob
+            for pattern in [
+                r"C:\Program Files\ODA\ODAFileConverter*\ODAFileConverter.exe",
+                r"C:\Program Files (x86)\ODA\ODAFileConverter*\ODAFileConverter.exe",
+            ]:
+                matches = _glob.glob(pattern)
+                if matches:
+                    ezdxf.options.set("odafc-addon", "win_exec_path", matches[0])
+                    break
+
+        if not odafc.is_installed():
+            raise RuntimeError(
+                "ODA File Converter is not installed.\n"
+                "Download free from: https://www.opendesign.com/guestfiles/oda_file_converter\n"
+                "Install to default location and restart."
+            )
+
+        print(f"Reading DWG via ODA File Converter...")
+        return odafc.readfile(str(file_path))
+
+    else:
+        # DXF: read with error recovery
+        try:
+            return ezdxf.readfile(str(file_path))
+        except Exception as e:
+            print(f"Normal read failed: {e}")
+            print("Trying recovery mode...")
+            return ezdxf.readfile(str(file_path), errors='ignore')
+
+
+def cad_to_stl(cad_path, stl_path=None):
+    """
+    Convert DWG/DXF file to STL by extracting 3DFACE entities.
+    Ignores malformed faces and only uses valid ones.
+    """
+    cad_path = Path(cad_path)
+
+    if not cad_path.exists():
+        raise FileNotFoundError(f"CAD file not found: {cad_path}")
 
     if stl_path is None:
-        stl_path = dxf_path.with_suffix('.stl')
+        stl_path = cad_path.with_suffix('.stl')
     else:
         stl_path = Path(stl_path)
 
-    print(f"Input:  {dxf_path}")
+    print(f"Input:  {cad_path}")
     print(f"Output: {stl_path}")
     print("\n" + "="*60)
-    print("Reading DXF file...")
+    print("Reading CAD file...")
     print("="*60)
 
-    # Read the DXF file with error recovery
-    try:
-        doc = ezdxf.readfile(str(dxf_path))
-    except Exception as e:
-        print(f"Normal read failed: {e}")
-        print("Trying recovery mode...")
-        doc = ezdxf.readfile(str(dxf_path), errors='ignore')
+    doc = read_cad_file(cad_path)
 
     msp = doc.modelspace()
 
@@ -367,16 +408,17 @@ def dxf_to_stl_3dface(dxf_path, stl_path=None):
         raise RuntimeError("STL file was not created")
 
 
+
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         input_file = sys.argv[1]
         output_file = sys.argv[2] if len(sys.argv) > 2 else None
     else:
-        print("Usage: python dxf_to_stl_3dface.py <input.dxf> [output.stl]")
+        print("Usage: python dwg_to_stl.py <input.dwg|dxf> [output.stl]")
         sys.exit(1)
 
     try:
-        result = dxf_to_stl_3dface(input_file, output_file)
+        result = cad_to_stl(input_file, output_file)
         print(f"\n[OK] Conversion complete!")
         print(f"Output: {result}")
     except Exception as e:
