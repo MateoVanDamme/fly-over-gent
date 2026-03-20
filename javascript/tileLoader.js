@@ -25,7 +25,7 @@ const loader = new STLLoader();
 const buildingMaterial = new THREE.MeshLambertMaterial({
     color: 0xffffff,
     flatShading: true,
-    side: THREE.BackSide,
+    side: THREE.DoubleSide,
     depthTest: true,
     depthWrite: true
 });
@@ -33,7 +33,7 @@ const buildingMaterial = new THREE.MeshLambertMaterial({
 const terrainMaterial = new THREE.MeshLambertMaterial({
     color: 0xffffff,
     flatShading: false,
-    side: THREE.BackSide,
+    side: THREE.DoubleSide,
     depthTest: true,
     depthWrite: true
 });
