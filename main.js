@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import Stats from 'three/addons/libs/stats.module.js';
 import { updateChunks } from './javascript/tileLoader.js';
+import { updateMinimap, minimapCanvas } from './javascript/minimap.js';
 
 let camera, scene, renderer, stats;
 
@@ -90,8 +91,10 @@ function init() {
 function toggleDebugInfo() {
     if (debugVisible) {
         stats.dom.style.display = 'block';
+        minimapCanvas.style.display = 'block';
     } else {
         stats.dom.style.display = 'none';
+        minimapCanvas.style.display = 'none';
     }
 }
 
@@ -137,6 +140,7 @@ function animate() {
     const deltaTime = Math.min(0.05, clock.getDelta());
     updateCamera(deltaTime);
     updateChunks(scene, camera.position);
+    updateMinimap(camera.position);
     renderer.render(scene, camera);
     stats.update();
 }
