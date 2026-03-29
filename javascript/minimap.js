@@ -48,7 +48,7 @@ refreshSWCache();
 setInterval(refreshSWCache, 5000);
 
 // Load tile data and build the static grid
-fetch('data/gent-in-3d.json')
+fetch('gent-in-3d.json')
     .then(r => r.json())
     .then(tileData => {
         const tileSet = new Set();
