@@ -1,8 +1,13 @@
-import { ORIGIN_X, ORIGIN_Y } from './tileLoader.js';
+import { ORIGIN_X, ORIGIN_Y, loadedTiles } from './tileLoader.js';
 
 const TILE_SIZE = 1000;
 const PIXEL_SIZE = 10; // pixels per tile on the minimap
 const PADDING = 10;
+
+// Colors
+const COLOR_TILE = '#ff0000';       // available tiles
+const COLOR_LOADED = '#ffffff';     // currently loaded tiles
+const COLOR_CAMERA = '#000000';     // camera position
 
 // Create canvas (initially hidden until data loads)
 const canvas = document.createElement('canvas');
@@ -57,7 +62,7 @@ fetch('data/gent-in-3d.json')
             const [tx, ty] = key.split('_').map(Number);
             const px = ((tx - _minX) / TILE_SIZE) * PIXEL_SIZE;
             const py = ((_maxY - ty) / TILE_SIZE) * PIXEL_SIZE;
-            staticCtx.fillStyle = '#ff3333';
+            staticCtx.fillStyle = COLOR_TILE;
             staticCtx.fillRect(px, py, PIXEL_SIZE - 1, PIXEL_SIZE - 1);
         }
 
@@ -77,10 +82,19 @@ export function updateMinimap(cameraPosition) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(staticCanvas, 0, 0);
 
-    // Draw camera dot
+    // Highlight loaded tiles
+    ctx.fillStyle = COLOR_LOADED;
+    for (const key of loadedTiles.keys()) {
+        const [tx, ty] = key.split('_').map(Number);
+        const px = ((tx - minX) / TILE_SIZE) * PIXEL_SIZE;
+        const py = ((maxY - ty) / TILE_SIZE) * PIXEL_SIZE;
+        ctx.fillRect(px, py, PIXEL_SIZE - 1, PIXEL_SIZE - 1);
+    }
+
+    // Draw camera position
     const camPx = ((lambertX - minX) / TILE_SIZE) * PIXEL_SIZE;
     const camPy = ((maxY - lambertY) / TILE_SIZE) * PIXEL_SIZE;
 
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = COLOR_CAMERA;
     ctx.fillRect(camPx - 4, camPy - 4, 8, 8);
 }

@@ -13,7 +13,7 @@ export const ORIGIN_X = 104000;
 export const ORIGIN_Y = 193000;
 
 // Track loaded tiles: key "x_y" → THREE.Group
-const loadedTiles = new Map();
+export const loadedTiles = new Map();
 // Track tiles currently being loaded to avoid duplicate requests
 const loadingTiles = new Set();
 // Cache last tile coord to skip redundant updateChunks calls
