@@ -1,13 +1,15 @@
-import { ORIGIN_X, ORIGIN_Y, loadedTiles } from './tileLoader.js';
+import { ORIGIN_X, ORIGIN_Y, loadedTiles, loadingTiles, tileCache } from './tileLoader.js';
 
 const TILE_SIZE = 1000;
 const PIXEL_SIZE = 10; // pixels per tile on the minimap
 const PADDING = 10;
 
-// Colors
-const COLOR_TILE = '#ff0000';       // available tiles
-const COLOR_LOADED = '#ffffff';     // currently loaded tiles
-const COLOR_CAMERA = '#000000';     // camera position
+// Colors (blackbody heat: dark red → red → orange → yellow → white)
+const COLOR_TILE = '#551100';       // available tiles (dark ember)
+const COLOR_CACHED = '#cc3300';     // cached (red)
+const COLOR_LOADING = '#ff8800';    // loading (orange)
+const COLOR_LOADED = '#ffee55';     // loaded in scene (yellow-hot)
+const COLOR_CAMERA = '#ffffff';     // camera position (white-hot)
 
 // Create canvas (initially hidden until data loads)
 const canvas = document.createElement('canvas');
@@ -82,7 +84,25 @@ export function updateMinimap(cameraPosition) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(staticCanvas, 0, 0);
 
-    // Highlight loaded tiles
+    // Highlight cached tiles (orange)
+    ctx.fillStyle = COLOR_CACHED;
+    for (const key of tileCache.keys()) {
+        const [tx, ty] = key.split('_').map(Number);
+        const px = ((tx - minX) / TILE_SIZE) * PIXEL_SIZE;
+        const py = ((maxY - ty) / TILE_SIZE) * PIXEL_SIZE;
+        ctx.fillRect(px, py, PIXEL_SIZE - 1, PIXEL_SIZE - 1);
+    }
+
+    // Highlight loading tiles (green)
+    ctx.fillStyle = COLOR_LOADING;
+    for (const key of loadingTiles.keys()) {
+        const [tx, ty] = key.split('_').map(Number);
+        const px = ((tx - minX) / TILE_SIZE) * PIXEL_SIZE;
+        const py = ((maxY - ty) / TILE_SIZE) * PIXEL_SIZE;
+        ctx.fillRect(px, py, PIXEL_SIZE - 1, PIXEL_SIZE - 1);
+    }
+
+    // Highlight loaded tiles (white)
     ctx.fillStyle = COLOR_LOADED;
     for (const key of loadedTiles.keys()) {
         const [tx, ty] = key.split('_').map(Number);

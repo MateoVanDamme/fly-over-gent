@@ -4,33 +4,29 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
     <title>Fly Over Gent</title>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background-color: #cccccc;
-            color: #000;
-        }
-        #loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #fff;
-            font-size: 14px;
-            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Consolas', monospace;
-        }
-        .debug-info {
-            transition: opacity 0.3s ease;
-        }
-        .debug-info.hidden {
-            opacity: 0;
-            pointer-events: none;
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="loading">Loading city tiles...</div>
+
+    <div id="controls-overlay" class="debug-info">
+        <div class="overlay-hint">Press <kbd>I</kbd> to hide</div>
+        <h3>Minimap</h3>
+        <div class="legend-grid">
+            <span class="legend-swatch" style="background:#551100;"></span><span>Available</span>
+            <span class="legend-swatch" style="background:#cc3300;"></span><span>Cached</span>
+            <span class="legend-swatch" style="background:#ff8800;"></span><span>Loading</span>
+            <span class="legend-swatch" style="background:#ffee55;"></span><span>Loaded</span>
+            <span class="legend-swatch" style="background:#ffffff;"></span><span>Camera</span>
+        </div>
+        <h3 style="margin-top: 10px;">Controls</h3>
+        <div class="controls-grid">
+            <kbd>WASD</kbd><span>Move</span>
+            <kbd>Space / Shift</kbd><span>Fly up / down</span>
+            <kbd>Mouse</kbd><span>Look around</span>
+            <kbd>I</kbd><span>Toggle UI</span>
+        </div>
+    </div>
 
     <script type="importmap">
     {

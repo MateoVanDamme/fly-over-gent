@@ -12,12 +12,16 @@ const VIEW_DISTANCE = 2; // tiles in each direction (2 = 5x5 grid)
 export const ORIGIN_X = 104000;
 export const ORIGIN_Y = 193000;
 
-// Track loaded tiles: key "x_y" → THREE.Group
+// Track loaded tiles: key "x_y" → THREE.Group (currently in scene)
 export const loadedTiles = new Map();
-// Track tiles currently being loaded to avoid duplicate requests
-const loadingTiles = new Set();
-// Cache last tile coord to skip redundant updateChunks calls
+// Track tiles currently being loaded: key "x_y" → AbortController
+export const loadingTiles = new Map();
+// Cache of tiles removed from scene but kept in memory: key "x_y" → THREE.Group
+export const tileCache = new Map();
+// Cache last state to skip redundant updateChunks calls
 let lastCameraTileKey = '';
+let lastDirX = 0;
+let lastDirY = 0;
 
 const loader = new STLLoader();
 
@@ -95,33 +99,27 @@ function getTilePaths(tileX, tileY) {
 /**
  * Load a single STL and return a promise resolving to the mesh
  */
-function loadSTL(url, material, isTerrain, tileX, tileY) {
-    return new Promise((resolve, reject) => {
-        loader.load(
-            url,
-            (geometry) => {
-                // Translate geometry from Lambert-72 coords to local origin
-                geometry.translate(-tileX, -tileY, 0);
-                geometry.computeVertexNormals();
-                geometry.computeBoundingSphere();
+async function loadSTL(url, material, isTerrain, tileX, tileY, signal) {
+    const response = await fetch(url, { signal });
+    const buffer = await response.arrayBuffer();
 
-                const mesh = new THREE.Mesh(geometry, material);
+    const geometry = loader.parse(buffer);
+    geometry.translate(-tileX, -tileY, 0);
+    geometry.computeVertexNormals();
+    geometry.computeBoundingSphere();
 
-                if (EDGES_ENABLED) {
-                    const edgeThreshold = isTerrain ? 1 : 10;
-                    const edgeColor = isTerrain ? 0x999999 : 0x000000;
-                    const edges = new THREE.EdgesGeometry(geometry, edgeThreshold);
-                    const lineMaterial = new THREE.LineBasicMaterial({ color: edgeColor, linewidth: 1 });
-                    const edgeLines = new THREE.LineSegments(edges, lineMaterial);
-                    mesh.add(edgeLines);
-                }
+    const mesh = new THREE.Mesh(geometry, material);
 
-                resolve(mesh);
-            },
-            undefined,
-            (error) => reject(error)
-        );
-    });
+    if (EDGES_ENABLED) {
+        const edgeThreshold = isTerrain ? 1 : 10;
+        const edgeColor = isTerrain ? 0x999999 : 0x000000;
+        const edges = new THREE.EdgesGeometry(geometry, edgeThreshold);
+        const lineMaterial = new THREE.LineBasicMaterial({ color: edgeColor, linewidth: 1 });
+        const edgeLines = new THREE.LineSegments(edges, lineMaterial);
+        mesh.add(edgeLines);
+    }
+
+    return mesh;
 }
 
 /**
@@ -131,7 +129,18 @@ async function loadTile(scene, tileX, tileY) {
     const key = `${tileX}_${tileY}`;
     if (loadedTiles.has(key) || loadingTiles.has(key)) return;
 
-    loadingTiles.add(key);
+    // Restore from cache if available
+    const cached = tileCache.get(key);
+    if (cached) {
+        scene.add(cached);
+        loadedTiles.set(key, cached);
+        tileCache.delete(key);
+        console.log(`Restored tile ${key} from cache`);
+        return;
+    }
+
+    const controller = new AbortController();
+    loadingTiles.set(key, controller);
 
     const paths = getTilePaths(tileX, tileY);
     const group = new THREE.Group();
@@ -144,11 +153,11 @@ async function loadTile(scene, tileX, tileY) {
 
     // Load building and terrain in parallel, tolerating missing files
     const results = await Promise.allSettled([
-        loadSTL(paths.building, buildingMaterial, false, tileX, tileY),
-        loadSTL(paths.terrain, terrainMaterial, true, tileX, tileY)
+        loadSTL(paths.building, buildingMaterial, false, tileX, tileY, controller.signal),
+        loadSTL(paths.terrain, terrainMaterial, true, tileX, tileY, controller.signal)
     ]);
 
-    // If tile was unloaded while we were loading, abort
+    // If tile was cancelled while loading, discard
     if (!loadingTiles.has(key)) return;
     loadingTiles.delete(key);
 
@@ -171,45 +180,66 @@ async function loadTile(scene, tileX, tileY) {
  * Unload a tile: dispose geometry and remove from scene
  */
 function unloadTile(key) {
+    // Cancel in-flight request if still loading
+    const controller = loadingTiles.get(key);
+    if (controller) {
+        controller.abort();
+        loadingTiles.delete(key);
+        console.log(`Cancelled tile ${key}`);
+    }
+
     const group = loadedTiles.get(key);
     if (!group) return;
 
-    group.traverse((child) => {
-        if (child.geometry) child.geometry.dispose();
-        if (child.material && child.material !== buildingMaterial && child.material !== terrainMaterial) {
-            child.material.dispose();
-        }
-    });
-
+    // Remove from scene but keep in cache
     group.parent?.remove(group);
     loadedTiles.delete(key);
-    loadingTiles.delete(key);
-    console.log(`Unloaded tile ${key}`);
+    tileCache.set(key, group);
+    console.log(`Cached tile ${key}`);
 }
 
 /**
  * Call each frame: loads/unloads tiles to maintain a 3x3 grid around the camera
  */
-export function updateChunks(scene, cameraPosition) {
+export function updateChunks(scene, cameraPosition, cameraDirection) {
     const cameraTile = getCameraTile(cameraPosition);
     const cameraTileKey = `${cameraTile.x}_${cameraTile.y}`;
-    if (cameraTileKey === lastCameraTileKey) return;
+
+    // Camera forward direction in Lambert-72 space (x maps to lambertX, -z maps to lambertY)
+    const dirX = cameraDirection.x;
+    const dirY = -cameraDirection.z;
+
+    // Skip if neither position nor direction changed significantly
+    const dirChanged = Math.abs(dirX - lastDirX) > 0.3 || Math.abs(dirY - lastDirY) > 0.3;
+    if (cameraTileKey === lastCameraTileKey && !dirChanged) return;
     lastCameraTileKey = cameraTileKey;
+    lastDirX = dirX;
+    lastDirY = dirY;
 
     const desired = new Set();
     for (let dx = -VIEW_DISTANCE; dx <= VIEW_DISTANCE; dx++) {
         for (let dy = -VIEW_DISTANCE; dy <= VIEW_DISTANCE; dy++) {
-            const tx = cameraTile.x + dx * TILE_SIZE;
-            const ty = cameraTile.y + dy * TILE_SIZE;
-            desired.add(`${tx}_${ty}`);
+            // Always keep the tile we're standing on
+            if (dx === 0 && dy === 0) {
+                desired.add(`${cameraTile.x}_${cameraTile.y}`);
+                continue;
+            }
+            // Dot product between camera direction and tile offset
+            const dot = dx * dirX + dy * dirY;
+            if (dot >= -0.3) { // generous ~110° half-angle in front
+                const tx = cameraTile.x + dx * TILE_SIZE;
+                const ty = cameraTile.y + dy * TILE_SIZE;
+                desired.add(`${tx}_${ty}`);
+            }
         }
     }
 
-    // Unload tiles no longer in range
+    // Unload/cancel tiles no longer in range
     for (const key of loadedTiles.keys()) {
-        if (!desired.has(key)) {
-            unloadTile(key);
-        }
+        if (!desired.has(key)) unloadTile(key);
+    }
+    for (const key of loadingTiles.keys()) {
+        if (!desired.has(key)) unloadTile(key);
     }
 
     // Load new tiles
