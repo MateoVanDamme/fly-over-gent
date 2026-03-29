@@ -6,7 +6,8 @@ const PADDING = 10;
 
 // Colors (blackbody heat: dark red → red → orange → yellow → white)
 const COLOR_TILE = '#551100';       // available tiles (dark ember)
-const COLOR_CACHED = '#cc3300';     // cached (red)
+const COLOR_SW_CACHED = '#882200';  // in service worker cache (warm ember)
+const COLOR_CACHED = '#cc3300';     // in memory, not in scene (red)
 const COLOR_LOADING = '#ff8800';    // loading (orange)
 const COLOR_LOADED = '#ffee55';     // loaded in scene (yellow-hot)
 const COLOR_CAMERA = '#ffffff';     // camera position (white-hot)
@@ -23,10 +24,28 @@ canvas.style.cssText = `
     pointer-events: none;
 `;
 document.body.appendChild(canvas);
-export { canvas as minimapCanvas };
-
 let ctx, staticCanvas, minX, maxY;
 let ready = false;
+
+// Tiles known to be in the Service Worker cache
+const swCachedTiles = new Set();
+
+// Query SW cache for stored tiles
+async function refreshSWCache() {
+    if (!('caches' in self)) return;
+    try {
+        const cache = await caches.open('fly-over-ghent-tiles');
+        const keys = await cache.keys();
+        swCachedTiles.clear();
+        for (const request of keys) {
+            const match = request.url.match(/(?:Geb|Trn)_(\d+)_(\d+)/);
+            if (match) swCachedTiles.add(`${match[1]}_${match[2]}`);
+        }
+    } catch (e) { /* SW not available */ }
+}
+refreshSWCache();
+// Refresh SW cache list every 5 seconds
+setInterval(refreshSWCache, 5000);
 
 // Load tile data and build the static grid
 fetch('data/gent-in-3d.json')
@@ -84,7 +103,17 @@ export function updateMinimap(cameraPosition) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(staticCanvas, 0, 0);
 
-    // Highlight cached tiles (orange)
+    // Highlight SW-cached tiles
+    ctx.fillStyle = COLOR_SW_CACHED;
+    for (const key of swCachedTiles) {
+        if (loadedTiles.has(key) || tileCache.has(key)) continue;
+        const [tx, ty] = key.split('_').map(Number);
+        const px = ((tx - minX) / TILE_SIZE) * PIXEL_SIZE;
+        const py = ((maxY - ty) / TILE_SIZE) * PIXEL_SIZE;
+        ctx.fillRect(px, py, PIXEL_SIZE - 1, PIXEL_SIZE - 1);
+    }
+
+    // Highlight in-memory cached tiles
     ctx.fillStyle = COLOR_CACHED;
     for (const key of tileCache.keys()) {
         const [tx, ty] = key.split('_').map(Number);
@@ -93,7 +122,7 @@ export function updateMinimap(cameraPosition) {
         ctx.fillRect(px, py, PIXEL_SIZE - 1, PIXEL_SIZE - 1);
     }
 
-    // Highlight loading tiles (green)
+    // Highlight loading tiles
     ctx.fillStyle = COLOR_LOADING;
     for (const key of loadingTiles.keys()) {
         const [tx, ty] = key.split('_').map(Number);
@@ -102,7 +131,7 @@ export function updateMinimap(cameraPosition) {
         ctx.fillRect(px, py, PIXEL_SIZE - 1, PIXEL_SIZE - 1);
     }
 
-    // Highlight loaded tiles (white)
+    // Highlight loaded tiles
     ctx.fillStyle = COLOR_LOADED;
     for (const key of loadedTiles.keys()) {
         const [tx, ty] = key.split('_').map(Number);

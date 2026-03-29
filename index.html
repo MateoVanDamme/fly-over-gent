@@ -14,7 +14,8 @@
         <h3>Minimap</h3>
         <div class="legend-grid">
             <span class="legend-swatch" style="background:#551100;"></span><span>Available</span>
-            <span class="legend-swatch" style="background:#cc3300;"></span><span>Cached</span>
+            <span class="legend-swatch" style="background:#882200;"></span><span>SW cached</span>
+            <span class="legend-swatch" style="background:#cc3300;"></span><span>In memory</span>
             <span class="legend-swatch" style="background:#ff8800;"></span><span>Loading</span>
             <span class="legend-swatch" style="background:#ffee55;"></span><span>Loaded</span>
             <span class="legend-swatch" style="background:#ffffff;"></span><span>Camera</span>
@@ -38,6 +39,11 @@
     }
     </script>
 
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+    </script>
     <script type="module" src="main.js"></script>
 </body>
 </html>

@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
 // Data source configuration
-export const USE_ONLINE_DATA = true;
-export const ONLINE_DATA_BASE = 'https://storage.googleapis.com/fly-over-ghent/';
+const USE_ONLINE_DATA = true;
+const ONLINE_DATA_BASE = 'https://storage.googleapis.com/fly-over-ghent/';
 const EDGES_ENABLED = false;
 
 // Tile system constants
@@ -135,7 +135,6 @@ async function loadTile(scene, tileX, tileY) {
         scene.add(cached);
         loadedTiles.set(key, cached);
         tileCache.delete(key);
-        console.log(`Restored tile ${key} from cache`);
         return;
     }
 
@@ -172,7 +171,6 @@ async function loadTile(scene, tileX, tileY) {
     if (hasContent) {
         scene.add(group);
         loadedTiles.set(key, group);
-        console.log(`Loaded tile ${key}`);
     }
 }
 
@@ -185,7 +183,6 @@ function unloadTile(key) {
     if (controller) {
         controller.abort();
         loadingTiles.delete(key);
-        console.log(`Cancelled tile ${key}`);
     }
 
     const group = loadedTiles.get(key);
@@ -195,7 +192,6 @@ function unloadTile(key) {
     group.parent?.remove(group);
     loadedTiles.delete(key);
     tileCache.set(key, group);
-    console.log(`Cached tile ${key}`);
 }
 
 /**
