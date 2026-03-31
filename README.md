@@ -4,19 +4,26 @@ Interactive 3D viewer for flying through the city of Ghent using real city data.
 
 ## Features
 
-- **Free Flight**: Fly freely through the 3D city
-- **Real 3D City Models**: Official city data from Gent
-- **Lambert-1972 Coordinate System**: Accurate geographic positioning
+- **Free Flight** — Fly freely through the 3D city with WASD + mouse controls
+- **Real 3D City Models** — Official open data from the City of Gent (199 building tiles, 211 terrain tiles)
+- **Dynamic Tile Loading** — Minecraft-style chunk system loads tiles around the camera in real time
+- **Direction-Based Culling** — Only loads tiles in the camera's forward ~110° cone
+- **Service Worker Caching** — Tiles are cached locally after first download for instant revisits
+- **Minimap** — Real-time 2D overview showing tile states (available, cached, loading, loaded)
+- **Terrain Height Coloring** — Shader-based coloring: red below 6.5m, white above
+- **Precomputed Edge Lines** — Sharp edges on buildings and terrain rendered as lightweight line segments
 
 ## Controls
 
-- **Click** to capture mouse
-- **Mouse** to look around
-- **WASD** to move
-- **Space** to fly up
-- **Shift** to fly down
-- **I** - Toggle debug info
-- **ESC** to release mouse
+| Key | Action |
+|-----|--------|
+| **Click** | Capture mouse |
+| **Mouse** | Look around |
+| **WASD** | Move |
+| **Space** | Fly up |
+| **Shift** | Fly down |
+| **I** | Toggle debug info & minimap |
+| **ESC** | Release mouse |
 
 ## Data Source & License
 
@@ -32,17 +39,13 @@ Contains government information obtained under the free reuse model license Flan
 
 ### 1. Download Data
 
-Download all DWG files from the Gent 3D dataset:
-
 ```bash
 python pre-processing/download_gent_data.py
 ```
 
-This will download all building and terrain tiles from the City of Gent open data portal and organize them into the `data/` directory.
+Downloads all building and terrain DWG tiles from the City of Gent open data portal into `data/input/`.
 
-### 2. Convert to STL Format
-
-The `pre-processing/` directory contains Python scripts to convert DWG files to STL format.
+### 2. Convert DWG to STL
 
 #### Requirements
 
@@ -50,70 +53,88 @@ The `pre-processing/` directory contains Python scripts to convert DWG files to 
 pip install ezdxf numpy trimesh requests
 ```
 
-**Note:** DWG reading requires the free [ODA File Converter](https://www.opendesign.com/guestfiles/oda_file_converter) (~30MB). Install to default location; ezdxf auto-detects it.
+DWG reading requires the free [ODA File Converter](https://www.opendesign.com/guestfiles/oda_file_converter). Install to default location; ezdxf auto-detects it.
 
-#### Workflow
-
-**Single File Conversion:**
+#### Single file
 
 ```bash
 python pre-processing/dwg_to_stl.py <input.dwg|dxf> [output.stl]
 ```
-Converts DWG/DXF files (3DFACE entities and POLYLINE meshes) directly to STL format.
 
-**Batch Conversion:**
+#### Batch conversion
 
 ```bash
-# Convert all DWG files
-python pre-processing/run_all.py
-
-# Skip already converted files
-python pre-processing/run_all.py --skip-existing
-
-# Download data first, then convert
-python pre-processing/run_all.py --download
-
-# Only terrain or building files
-python pre-processing/run_all.py --pattern "*Trn_*"
-python pre-processing/run_all.py --pattern "*Geb_*"
+python pre-processing/run_all.py              # convert all
+python pre-processing/run_all.py --skip-existing  # skip already converted
+python pre-processing/run_all.py --download       # download first, then convert
+python pre-processing/run_all.py --pattern "*Geb_*"  # only buildings
+python pre-processing/run_all.py --pattern "*Trn_*"  # only terrain
 ```
 
-Scans `data/input/` for DWG files and outputs to `data/stl/`. For custom directories use `batch_convert.py` directly.
+STL output goes to `data/stl/` with Lambert-72 coordinates in meters.
 
-#### Output Format
+### 3. Edge Extraction
 
-The scripts export STL files with coordinates in **meters** and Lambert-72 coordinate system positioning. The resulting STL files can be placed directly in the `data/` directory structure.
+Sharp edges are precomputed automatically during STL conversion. To regenerate edges for a single tile:
 
-#### File Types
+```bash
+python pre-processing/regen_edges.py 104 193            # default terrain angle=3
+python pre-processing/regen_edges.py 104 193 --angle 5  # custom terrain threshold
+```
 
-The Gent 3D dataset contains two types of files per tile:
-- **Buildings** (`Geb_*.dwg`) - 3D building models
-- **Terrain** (`Trn_*.dwg`) - Ground elevation data
+Edge files are saved alongside STLs in `data/stl/`:
+- **Building edges** (`Edg_*.bin`) — angle threshold 10°
+- **Terrain edges** (`TrnEdg_*.bin`) — angle threshold 3°
+
+Binary format: flat `float32` array of `[x1,y1,z1, x2,y2,z2, ...]` line segment pairs.
+
+### 4. Upload to GCS
+
+STL and edge `.bin` files are hosted on Google Cloud Storage at `https://storage.googleapis.com/fly-over-ghent/stl/`. Upload the contents of `data/stl/` there for the online viewer to use.
+
+### File types per tile
+
+| Type | STL | Edges | Description |
+|------|-----|-------|-------------|
+| Buildings | `Geb_*.stl` | `Edg_*.bin` | 3D building geometry |
+| Terrain | `Trn_*.stl` | `TrnEdg_*.bin` | Ground elevation mesh |
 
 ## Tech Stack
 
-- Three.js for 3D rendering
-- STL file format for city geometry
-- Vanilla JavaScript (no framework)
+- **Three.js** 0.160.0 — 3D rendering
+- **STL** — City geometry format
+- **Service Worker** — Offline tile caching
+- **Vanilla JavaScript** — No framework
 
-## Performance Optimizations
+# Performance
 
-The following optimizations have been implemented to improve rendering performance:
+## Tile Loading
 
-### Rendering Optimizations
-- **Lambert Shading**: Using `MeshLambertMaterial` instead of `MeshPhongMaterial` for cheaper per-pixel lighting calculations (~30-40% faster)
-- **Flat Shading**: Enabled `flatShading: true` for simpler normal calculations and better visual clarity on architectural geometry
-- **Reduced Lighting**: Using 1 ambient + 1 directional light (down from 1 ambient + 2 directional) for fewer lighting calculations per fragment
-- **Single-Sided Rendering**: Using `THREE.BackSide` instead of `THREE.DoubleSide` renders only one face per triangle (50% fewer fragments). The STL files have inverted normals, so BackSide is the correct choice and is faster than DoubleSide
+Tiles are loaded dynamically in a Minecraft-style chunk system (`javascript/tileLoader.js`):
 
-### Geometry & Memory Optimizations
-- **Material Reuse**: Materials are created once at module scope and shared across all tiles, improving GPU batching efficiency and reducing memory overhead
-- **Bounding Sphere Computation**: Each tile geometry has computed bounding spheres (`computeBoundingSphere()`), enabling Three.js frustum culling to automatically skip rendering tiles outside the camera view
-  - Critical for future dynamic tile loading system (Minecraft-style)
-  - Only visible tiles are rendered, providing massive performance gains when looking at portions of the city
+- **View distance**: 2 tiles in each direction (up to 5x5 grid)
+- **Direction-based loading**: Uses the dot product between camera direction and tile offset to only load tiles in a ~110° forward cone, skipping tiles behind the camera
+- **Three-tier cache**: Loaded (in scene) → In-memory cache (removed from scene, geometry kept) → Unloaded (disposed)
+- **Abort on leave**: In-flight fetch requests are cancelled via `AbortController` when a tile leaves the view range
+- **Deduplication**: Skips redundant `updateChunks` calls when neither camera tile nor direction changed
 
-### Performance Impact
-These optimizations provide significant FPS improvements, especially when:
-- Not all tiles are in view (frustum culling skips off-screen tiles)
-- Running on lower-end hardware (simpler shading models)
-- Preparing for dynamic tile loading with 50+ tiles (material reuse and culling become essential)
+## Caching
+
+### Service Worker (`sw.js`)
+
+A service worker intercepts fetch requests for STL and edge files from Google Cloud Storage. On first load, tiles are fetched from the network and stored in the browser's Cache API. Subsequent visits serve tiles from cache instantly (cache-first strategy).
+
+### In-Memory Tile Cache
+
+When a tile leaves the view range, its Three.js Group is removed from the scene but kept in memory (`tileCache`). If the camera returns, the tile is re-added to the scene instantly without re-fetching or re-parsing.
+
+## Rendering
+
+- **Lambert shading**: `MeshLambertMaterial` for cheaper per-pixel lighting
+- **Flat shading**: `flatShading: true` on buildings for clear architectural edges
+- **Precomputed edges**: Sharp edges extracted at build time and stored as binary files, replacing the expensive runtime `EdgesGeometry` computation
+- **Material reuse**: Single shared material per geometry type across all tiles
+- **Frustum culling**: `computeBoundingSphere()` on every geometry lets Three.js skip off-screen tiles
+- **Fog**: Linear fog from 0–4000 units hides tile pop-in at the edges
+- **Sort disabled**: `renderer.sortObjects = false` for a faster render loop
+- **Terrain height shader**: Custom `onBeforeCompile` shader colors terrain by elevation (red below 6.5m, white above) without extra draw calls

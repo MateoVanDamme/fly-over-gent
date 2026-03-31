@@ -4,7 +4,6 @@ import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 // Data source configuration
 const USE_ONLINE_DATA = true;
 const ONLINE_DATA_BASE = 'https://storage.googleapis.com/fly-over-ghent/';
-const EDGES_ENABLED = false;
 
 // Tile system constants
 const TILE_SIZE = 1000;
@@ -75,7 +74,7 @@ terrainMaterial.onBeforeCompile = (shader) => {
 /**
  * Convert camera world position to Lambert-72 tile coordinates
  */
-function getCameraTile(cameraPosition) {
+export function getCameraTile(cameraPosition) {
     const lambertX = ORIGIN_X + cameraPosition.x;
     const lambertY = ORIGIN_Y - cameraPosition.z;
     return {
@@ -92,14 +91,16 @@ function getTilePaths(tileX, tileY) {
     const coord = `${tileX}_${tileY}`;
     return {
         building: dataPath + `stl/Geb_${coord}_10_2_N_2013.stl`,
-        terrain: dataPath + `stl/Trn_${coord}_10_0_N_2013.stl`
+        terrain: dataPath + `stl/Trn_${coord}_10_0_N_2013.stl`,
+        buildingEdges: dataPath + `stl/Edg_${coord}_10_2_N_2013.bin`,
+        terrainEdges: dataPath + `stl/TrnEdg_${coord}_10_0_N_2013.bin`
     };
 }
 
 /**
  * Load a single STL and return a promise resolving to the mesh
  */
-async function loadSTL(url, material, isTerrain, tileX, tileY, signal) {
+async function loadSTL(url, material, tileX, tileY, signal) {
     const response = await fetch(url, { signal });
     const buffer = await response.arrayBuffer();
 
@@ -108,18 +109,22 @@ async function loadSTL(url, material, isTerrain, tileX, tileY, signal) {
     geometry.computeVertexNormals();
     geometry.computeBoundingSphere();
 
-    const mesh = new THREE.Mesh(geometry, material);
+    return new THREE.Mesh(geometry, material);
+}
 
-    if (EDGES_ENABLED) {
-        const edgeThreshold = isTerrain ? 1 : 10;
-        const edgeColor = isTerrain ? 0x999999 : 0x000000;
-        const edges = new THREE.EdgesGeometry(geometry, edgeThreshold);
-        const lineMaterial = new THREE.LineBasicMaterial({ color: edgeColor, linewidth: 1 });
-        const edgeLines = new THREE.LineSegments(edges, lineMaterial);
-        mesh.add(edgeLines);
-    }
+const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 1 });
 
-    return mesh;
+async function loadEdges(url, material, tileX, tileY, signal) {
+    const response = await fetch(url, { signal });
+    if (!response.ok) return null;
+    const buffer = await response.arrayBuffer();
+    const positions = new Float32Array(buffer);
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.translate(-tileX, -tileY, 0);
+
+    return new THREE.LineSegments(geometry, material);
 }
 
 /**
@@ -150,10 +155,12 @@ async function loadTile(scene, tileX, tileY) {
     group.position.set(worldX, 0, worldZ);
     group.rotation.x = -Math.PI / 2;
 
-    // Load building and terrain in parallel, tolerating missing files
+    // Load building, terrain, and precomputed edges in parallel, tolerating missing files
     const results = await Promise.allSettled([
-        loadSTL(paths.building, buildingMaterial, false, tileX, tileY, controller.signal),
-        loadSTL(paths.terrain, terrainMaterial, true, tileX, tileY, controller.signal)
+        loadSTL(paths.building, buildingMaterial, tileX, tileY, controller.signal),
+        loadSTL(paths.terrain, terrainMaterial, tileX, tileY, controller.signal),
+        loadEdges(paths.buildingEdges, edgeMaterial, tileX, tileY, controller.signal),
+        loadEdges(paths.terrainEdges, edgeMaterial, tileX, tileY, controller.signal)
     ]);
 
     // If tile was cancelled while loading, discard
@@ -162,7 +169,7 @@ async function loadTile(scene, tileX, tileY) {
 
     let hasContent = false;
     for (const result of results) {
-        if (result.status === 'fulfilled') {
+        if (result.status === 'fulfilled' && result.value) {
             group.add(result.value);
             hasContent = true;
         }

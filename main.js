@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import Stats from 'three/addons/libs/stats.module.js';
-import { updateChunks } from './javascript/tileLoader.js';
+import { updateChunks, getCameraTile } from './javascript/tileLoader.js';
 import { updateMinimap } from './javascript/minimap.js';
 
 let camera, scene, renderer, stats;
@@ -143,6 +143,8 @@ function animate() {
     camera.getWorldDirection(direction);
     updateChunks(scene, camera.position, direction);
     updateMinimap(camera.position);
+    const tile = getCameraTile(camera.position);
+    document.getElementById('tile-info').textContent = `${tile.x}, ${tile.y}`;
     renderer.render(scene, camera);
     stats.update();
 }

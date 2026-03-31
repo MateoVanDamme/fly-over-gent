@@ -70,6 +70,66 @@ def dwg_to_dxf(dwg_path, cache_dir=None):
     return dxf_path
 
 
+def extract_edges(stl_path, edge_path, angle_threshold=10):
+    """Extract sharp edges from an STL and save as flat binary float32 pairs.
+
+    Deduplicates the mesh (STL files often have duplicate faces), then finds
+    edges where adjacent face normals diverge beyond the angle threshold.
+    """
+    mesh = trimesh.load(str(stl_path))
+    mesh.merge_vertices()
+
+    threshold_dot = np.cos(np.radians(angle_threshold))
+    verts = mesh.vertices
+    faces = mesh.faces
+
+    # Compute face normals from vertices and remove degenerate faces
+    v0 = verts[faces[:, 0]]
+    v1 = verts[faces[:, 1]]
+    v2 = verts[faces[:, 2]]
+    normals = np.cross(v1 - v0, v2 - v0)
+    lengths = np.linalg.norm(normals, axis=1)
+    valid = lengths > 1e-10
+    faces = faces[valid]
+    normals = normals[valid] / lengths[valid, None]
+
+    # Directed edge matching on shared-vertex mesh.
+    edge_data = {}   # directed (a, b) → face_index
+    sharp = []
+
+    for fi, face in enumerate(faces):
+        for j in range(3):
+            a, b = int(face[j]), int(face[(j + 1) % 3])
+            rev = (b, a)
+
+            if rev in edge_data:
+                fi2 = edge_data.pop(rev)
+                dot = np.dot(normals[fi], normals[fi2])
+                if dot <= threshold_dot:
+                    sharp.append((a, b))
+            else:
+                edge_data[(a, b)] = fi
+
+    # Unmatched edges are boundary edges — always include
+    for (a, b) in edge_data:
+        sharp.append((a, b))
+
+    if not sharp:
+        print(f"  -> No sharp edges found, skipping {edge_path.name}")
+        return
+
+    # Build flat array: [x1,y1,z1, x2,y2,z2, ...]
+    verts = mesh.vertices
+    segments = np.empty((len(sharp), 6), dtype=np.float32)
+    for i, (a, b) in enumerate(sharp):
+        segments[i, :3] = verts[a]
+        segments[i, 3:] = verts[b]
+
+    segments.tofile(str(edge_path))
+    size_kb = edge_path.stat().st_size / 1024
+    print(f"  -> {edge_path.name} ({size_kb:.0f} KB, {len(sharp):,} edges)")
+
+
 def dxf_to_stl(dxf_path, stl_path):
     """Convert DXF file to STL."""
     dxf_path = Path(dxf_path)
@@ -136,6 +196,19 @@ def dxf_to_stl(dxf_path, stl_path):
 
     size_mb = stl_path.stat().st_size / (1024 * 1024)
     print(f"  -> {stl_path.name} ({size_mb:.1f} MB, {n:,} faces)")
+
+    # Extract precomputed edges
+    if stl_path.name.startswith('Geb_'):
+        edge_path = stl_path.with_name(
+            stl_path.name.replace('Geb_', 'Edg_').replace('.stl', '.bin')
+        )
+        extract_edges(stl_path, edge_path)
+    elif stl_path.name.startswith('Trn_'):
+        edge_path = stl_path.with_name(
+            stl_path.name.replace('Trn_', 'TrnEdg_').replace('.stl', '.bin')
+        )
+        extract_edges(stl_path, edge_path, angle_threshold=3)
+
     return stl_path
 
 
