@@ -112,7 +112,8 @@ async function loadSTL(url, material, tileX, tileY, signal) {
     return new THREE.Mesh(geometry, material);
 }
 
-const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 1 });
+const buildingEdgeMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 1 });
+const terrainEdgeMaterial = new THREE.LineBasicMaterial({ color: 0x999999, linewidth: 1 });
 
 async function loadEdges(url, material, tileX, tileY, signal) {
     const response = await fetch(url, { signal });
@@ -159,8 +160,8 @@ async function loadTile(scene, tileX, tileY) {
     const results = await Promise.allSettled([
         loadSTL(paths.building, buildingMaterial, tileX, tileY, controller.signal),
         loadSTL(paths.terrain, terrainMaterial, tileX, tileY, controller.signal),
-        loadEdges(paths.buildingEdges, edgeMaterial, tileX, tileY, controller.signal),
-        loadEdges(paths.terrainEdges, edgeMaterial, tileX, tileY, controller.signal)
+        loadEdges(paths.buildingEdges, buildingEdgeMaterial, tileX, tileY, controller.signal),
+        loadEdges(paths.terrainEdges, terrainEdgeMaterial, tileX, tileY, controller.signal)
     ]);
 
     // If tile was cancelled while loading, discard
