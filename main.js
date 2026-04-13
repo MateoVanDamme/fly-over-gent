@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import Stats from 'three/addons/libs/stats.module.js';
-import { updateChunks, getCameraTile } from './javascript/tileLoader.js';
+import { updateChunks, getCameraTile, clearAllTiles, getDataSource, setDataSource } from './javascript/tileLoader.js';
 import { updateMinimap } from './javascript/minimap.js';
 
 let camera, scene, renderer, stats;
@@ -71,6 +71,12 @@ function init() {
         if (event.code === 'KeyI') {
             debugVisible = !debugVisible;
             toggleDebugInfo();
+        }
+        if (event.code === 'KeyO') {
+            const newSource = getDataSource() === 'stl' ? 'osm' : 'stl';
+            setDataSource(newSource);
+            clearAllTiles(scene);
+            console.log(`Data source switched to: ${newSource}`);
         }
     });
 

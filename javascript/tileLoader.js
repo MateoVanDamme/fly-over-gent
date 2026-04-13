@@ -1,9 +1,16 @@
 import * as THREE from 'three';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+import { loadOSMTile } from './osmTileLoader.js';
 
 // Data source configuration
 const USE_ONLINE_DATA = true;
 const ONLINE_DATA_BASE = 'https://storage.googleapis.com/fly-over-ghent/';
+
+// Data source: 'stl' (Gent 3D) or 'osm' (OpenStreetMap)
+let dataSource = 'osm';
+
+export function getDataSource() { return dataSource; }
+export function setDataSource(source) { dataSource = source; }
 
 // Tile system constants
 const TILE_SIZE = 1000;
@@ -98,9 +105,19 @@ function getTilePaths(tileX, tileY) {
 }
 
 /**
+ * Get URLs for terrain STL + edges for a tile (exported for OSM loader reuse)
+ */
+export function getTerrainPaths(tileX, tileY) {
+    const paths = getTilePaths(tileX, tileY);
+    return { terrain: paths.terrain, terrainEdges: paths.terrainEdges };
+}
+
+export { terrainMaterial };
+
+/**
  * Load a single STL and return a promise resolving to the mesh
  */
-async function loadSTL(url, material, tileX, tileY, signal) {
+export async function loadSTL(url, material, tileX, tileY, signal) {
     const response = await fetch(url, { signal });
     const buffer = await response.arrayBuffer();
 
@@ -115,7 +132,9 @@ async function loadSTL(url, material, tileX, tileY, signal) {
 const buildingEdgeMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 1 });
 const terrainEdgeMaterial = new THREE.LineBasicMaterial({ color: 0x999999, linewidth: 1 });
 
-async function loadEdges(url, material, tileX, tileY, signal) {
+export { terrainEdgeMaterial };
+
+export async function loadEdges(url, material, tileX, tileY, signal) {
     const response = await fetch(url, { signal });
     if (!response.ok) return null;
     const buffer = await response.arrayBuffer();
@@ -146,6 +165,25 @@ async function loadTile(scene, tileX, tileY) {
 
     const controller = new AbortController();
     loadingTiles.set(key, controller);
+
+    if (dataSource === 'osm') {
+        try {
+            const group = await loadOSMTile(scene, tileX, tileY, controller.signal);
+            if (!loadingTiles.has(key)) return;
+            loadingTiles.delete(key);
+            if (group.children.length > 0) {
+                scene.add(group);
+                loadedTiles.set(key, group);
+            }
+        } catch (e) {
+            loadingTiles.delete(key);
+            // 404 = no OSM data for this tile (outside coverage), silently skip
+            if (e.name !== 'AbortError' && !e.message.includes('404')) {
+                console.warn(`OSM tile ${key} failed:`, e);
+            }
+        }
+        return;
+    }
 
     const paths = getTilePaths(tileX, tileY);
     const group = new THREE.Group();
@@ -200,6 +238,37 @@ function unloadTile(key) {
     group.parent?.remove(group);
     loadedTiles.delete(key);
     tileCache.set(key, group);
+}
+
+/**
+ * Clear all loaded, loading, and cached tiles (used when switching data source)
+ */
+export function clearAllTiles(scene) {
+    // Abort in-flight loads
+    for (const controller of loadingTiles.values()) {
+        controller.abort();
+    }
+    loadingTiles.clear();
+
+    // Remove loaded tiles from scene and dispose
+    for (const group of loadedTiles.values()) {
+        group.parent?.remove(group);
+        group.traverse((child) => {
+            if (child.geometry) child.geometry.dispose();
+        });
+    }
+    loadedTiles.clear();
+
+    // Dispose cached tiles
+    for (const group of tileCache.values()) {
+        group.traverse((child) => {
+            if (child.geometry) child.geometry.dispose();
+        });
+    }
+    tileCache.clear();
+
+    // Reset camera tile tracking so updateChunks reloads immediately
+    lastCameraTileKey = '';
 }
 
 /**
