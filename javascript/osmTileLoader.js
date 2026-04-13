@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ORIGIN_X, ORIGIN_Y } from './tileLoader.js';
 import { wgs84ToLambert72 } from './lambertProjection.js';
 
@@ -19,9 +20,11 @@ const WHITE = 0xffffff;
 const matBuilding   = new THREE.MeshLambertMaterial({ color: WHITE, flatShading: true, side: THREE.DoubleSide });
 const matRoof       = new THREE.MeshLambertMaterial({ color: WHITE, flatShading: true, side: THREE.DoubleSide });
 const matEdge       = new THREE.LineBasicMaterial({ color: 0x000000 });
-const matRoad       = new THREE.MeshLambertMaterial({ color: WHITE });
-const matFootway    = new THREE.MeshLambertMaterial({ color: WHITE });
-const matCycleway   = new THREE.MeshLambertMaterial({ color: WHITE });
+const RED = 0xcc0000;
+const matRoad       = new THREE.MeshLambertMaterial({ color: RED });
+const matFootway    = new THREE.MeshLambertMaterial({ color: RED });
+const matCycleway   = new THREE.MeshLambertMaterial({ color: RED });
+const matGround     = new THREE.MeshLambertMaterial({ color: WHITE, side: THREE.DoubleSide });
 const matRail       = new THREE.MeshLambertMaterial({ color: WHITE });
 const matBridgeDeck = new THREE.MeshLambertMaterial({ color: WHITE });
 const matBridgeSide = new THREE.MeshLambertMaterial({ color: WHITE });
@@ -117,10 +120,22 @@ function getRoofHeight(tags, defaultH) {
     return defaultH;
 }
 
+// Push a geometry into a per-material bucket for later merging.
+// Strips attributes that are incompatible across sources so mergeGeometries can work.
+function pushGeo(buckets, material, geometry) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', geometry.attributes.position);
+    if (geometry.attributes.normal) g.setAttribute('normal', geometry.attributes.normal);
+    if (geometry.index) g.setIndex(geometry.index);
+    let list = buckets.get(material);
+    if (!list) buckets.set(material, list = []);
+    list.push(g);
+}
+
 /**
- * Build a pyramidal roof (single apex at centroid).
+ * Build a pyramidal roof (single apex at centroid). Returns BufferGeometry.
  */
-function buildPyramidalRoof(pts, baseZ, roofH) {
+function buildPyramidalRoofGeo(pts, baseZ, roofH) {
     const cx = pts.reduce((s,p)=>s+p.x,0) / pts.length;
     const cy = pts.reduce((s,p)=>s+p.y,0) / pts.length;
     const apex = [cx, cy, baseZ + roofH];
@@ -134,13 +149,13 @@ function buildPyramidalRoof(pts, baseZ, roofH) {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
     geo.computeVertexNormals();
-    return new THREE.Mesh(geo, matRoof);
+    return geo;
 }
 
 /**
  * Build a gabled (tent) roof. Uses bbox: ridge runs along the longer axis.
  */
-function buildGabledRoof(pts, baseZ, roofH) {
+function buildGabledRoofGeo(pts, baseZ, roofH) {
     const bb = bbox(pts);
     const along = bb.w >= bb.h; // ridge along X (true) or Y
     const ridgeZ = baseZ + roofH;
@@ -179,10 +194,10 @@ function buildGabledRoof(pts, baseZ, roofH) {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
     geo.computeVertexNormals();
-    return new THREE.Mesh(geo, matRoof);
+    return geo;
 }
 
-function addBuilding(group, way, nodeIndex, tileX, tileY) {
+function addBuilding(buckets, way, nodeIndex, tileX, tileY) {
     const nodes = resolveWay(way, nodeIndex);
     if (!nodes || nodes.length < 4) return;
     const pts = projectNodes(nodes, tileX, tileY);
@@ -203,22 +218,17 @@ function addBuilding(group, way, nodeIndex, tileX, tileY) {
 
     const wallGeo = new THREE.ExtrudeGeometry(shape, { depth: wallH, bevelEnabled: false });
     wallGeo.computeVertexNormals();
-    const wallMesh = new THREE.Mesh(wallGeo, matBuilding);
-    group.add(wallMesh);
-    group.add(new THREE.LineSegments(new THREE.EdgesGeometry(wallGeo, 30), matEdge));
+    pushGeo(buckets, matBuilding, wallGeo);
 
     // Roof
     if (roofH > 0) {
-        let roof;
+        let roofGeo;
         if (roofShape === 'pyramidal' || roofShape === 'dome' || roofShape === 'cone') {
-            roof = buildPyramidalRoof(pts, wallH, roofH);
+            roofGeo = buildPyramidalRoofGeo(pts, wallH, roofH);
         } else if (roofShape === 'gabled' || roofShape === 'hipped' || roofShape === 'mansard' || roofShape === 'skillion') {
-            roof = buildGabledRoof(pts, wallH, roofH);
+            roofGeo = buildGabledRoofGeo(pts, wallH, roofH);
         }
-        if (roof) {
-            group.add(roof);
-            group.add(new THREE.LineSegments(new THREE.EdgesGeometry(roof.geometry, 1), matEdge));
-        }
+        if (roofGeo) pushGeo(buckets, matRoof, roofGeo);
     }
 }
 
@@ -249,7 +259,7 @@ function getRoadMaterial(tags) {
  * Build a flat ribbon (extruded line with thickness) along the road centerline.
  * Thickness = small vertical extrusion so it sits on the ground.
  */
-function buildRibbon(pts, width, baseZ, thickness, material) {
+function buildRibbonGeo(pts, width, baseZ, thickness) {
     if (pts.length < 2) return null;
 
     // Build a quad strip perpendicular to each segment
@@ -311,35 +321,34 @@ function buildRibbon(pts, width, baseZ, thickness, material) {
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
     geo.setIndex(indices);
     geo.computeVertexNormals();
-    return new THREE.Mesh(geo, material);
+    return geo;
 }
 
-function addRoad(group, way, nodeIndex, tileX, tileY) {
+function addRoad(buckets, way, nodeIndex, tileX, tileY) {
     const nodes = resolveWay(way, nodeIndex);
     if (!nodes || nodes.length < 2) return;
     const pts = projectNodes(nodes, tileX, tileY);
     const width = getRoadWidth(way.tags);
-    const isBridge = way.tags.bridge && way.tags.bridge !== 'no';
     const isFoot = way.tags.highway === 'footway' || way.tags.highway === 'pedestrian'
                 || way.tags.highway === 'path' || way.tags.highway === 'steps';
 
     const baseZ = isFoot ? Z_FOOTWAY : Z_ROAD;
     const thickness = 0.3;
-    const mesh = buildRibbon(pts, width, baseZ, thickness, getRoadMaterial(way.tags));
-    if (mesh) group.add(mesh);
+    const geo = buildRibbonGeo(pts, width, baseZ, thickness);
+    if (geo) pushGeo(buckets, getRoadMaterial(way.tags), geo);
 }
 
-function addRail(group, way, nodeIndex, tileX, tileY) {
+function addRail(buckets, way, nodeIndex, tileX, tileY) {
     const nodes = resolveWay(way, nodeIndex);
     if (!nodes || nodes.length < 2) return;
     const pts = projectNodes(nodes, tileX, tileY);
-    const mesh = buildRibbon(pts, 2, Z_ROAD, 0.25, matRail);
-    if (mesh) group.add(mesh);
+    const geo = buildRibbonGeo(pts, 2, Z_ROAD, 0.25);
+    if (geo) pushGeo(buckets, matRail, geo);
 }
 
 // --- Polygons (water, parks, grass, pitches) ---
 
-function makePolygonMesh(pts, holes, baseZ, material) {
+function makePolygonGeo(pts, holes, baseZ) {
     const shape = new THREE.Shape();
     shape.moveTo(pts[0].x, pts[0].y);
     for (let i = 1; i < pts.length; i++) shape.lineTo(pts[i].x, pts[i].y);
@@ -359,15 +368,15 @@ function makePolygonMesh(pts, holes, baseZ, material) {
     for (let i = 0; i < pos.count; i++) pos.setZ(i, baseZ);
     pos.needsUpdate = true;
     geo.computeVertexNormals();
-    return new THREE.Mesh(geo, material);
+    return geo;
 }
 
-function addPolygon(group, way, nodeIndex, tileX, tileY, baseZ, material) {
+function addPolygon(buckets, way, nodeIndex, tileX, tileY, baseZ, material) {
     const nodes = resolveWay(way, nodeIndex);
     if (!nodes || nodes.length < 4) return;
     const pts = projectNodes(nodes, tileX, tileY);
     if (Math.abs(polyArea(pts)) < 1) return;
-    group.add(makePolygonMesh(pts, null, baseZ, material));
+    pushGeo(buckets, material, makePolygonGeo(pts, null, baseZ));
 }
 
 /**
@@ -431,12 +440,12 @@ function pointInPolygon(p, poly) {
     return inside;
 }
 
-function addMultipolygon(group, relation, wayIndex, nodeIndex, tileX, tileY, baseZ, material) {
+function addMultipolygon(buckets, relation, wayIndex, nodeIndex, tileX, tileY, baseZ, material) {
     const polys = buildMultipolygon(relation, wayIndex, nodeIndex, tileX, tileY);
     for (const p of polys) {
         if (p.outer.length < 4) continue;
         if (Math.abs(polyArea(p.outer)) < 1) continue;
-        try { group.add(makePolygonMesh(p.outer, p.holes, baseZ, material)); } catch {}
+        try { pushGeo(buckets, material, makePolygonGeo(p.outer, p.holes, baseZ)); } catch {}
     }
 }
 
@@ -551,9 +560,17 @@ export async function loadOSMTile(scene, tileX, tileY, signal) {
     group.position.set(worldX, 0, worldZ);
     group.rotation.x = -Math.PI / 2;
 
+    // White ground underlayer: a 1x1km plane sitting just below z=0 per tile.
+    // In tile-local coords the tile spans (0..1000, 0..1000).
+    const groundGeo = new THREE.PlaneGeometry(1000, 1000);
+    groundGeo.translate(500, 500, -0.01);
+    group.add(new THREE.Mesh(groundGeo, matGround));
+
     // Collect point features for batched (instanced) creation.
     const treeNodes = [];
     const lampNodes = [];
+    // Collect one geometry bucket per material → merge at the end for minimal draw calls.
+    const buckets = new Map();
 
     // Process all features
     for (const el of data.elements) {
@@ -562,17 +579,17 @@ export async function loadOSMTile(scene, tileX, tileY, signal) {
         try {
             if (el.type === 'way') {
                 if (t.building || t['building:part']) {
-                    addBuilding(group, el, nodeIndex, tileX, tileY);
+                    addBuilding(buckets, el, nodeIndex, tileX, tileY);
                 } else if (t.highway === 'street_lamp') {
                     // skip — it's a node tag elsewhere
                 } else if (t.highway) {
-                    addRoad(group, el, nodeIndex, tileX, tileY);
+                    addRoad(buckets, el, nodeIndex, tileX, tileY);
                 } else if (t.railway === 'rail' || t.railway === 'tram' || t.railway === 'light_rail') {
-                    addRail(group, el, nodeIndex, tileX, tileY);
+                    addRail(buckets, el, nodeIndex, tileX, tileY);
                 } else if (t.natural === 'water' || t.water) {
                     // Skip ways that are part of a multipolygon — relation will render them
                     if (!waterMemberWayIds.has(el.id)) {
-                        addPolygon(group, el, nodeIndex, tileX, tileY, Z_WATER, matWater);
+                        addPolygon(buckets, el, nodeIndex, tileX, tileY, Z_WATER, matWater);
                     }
                 } else if (t.waterway === 'stream' || t.waterway === 'drain' || t.waterway === 'ditch') {
                     // Small waterways usually only have a centerline → narrow ribbon
@@ -580,26 +597,26 @@ export async function loadOSMTile(scene, tileX, tileY, signal) {
                     if (nodes && nodes.length >= 2) {
                         const pts = projectNodes(nodes, tileX, tileY);
                         const w = parseFloat(t.width) || 3;
-                        const m = buildRibbon(pts, w, Z_WATER, 0.05, matWater);
-                        if (m) group.add(m);
+                        const g = buildRibbonGeo(pts, w, Z_WATER, 0.05);
+                        if (g) pushGeo(buckets, matWater, g);
                     }
                 }
                 // Big waterways (river/canal): NOT rendered as ribbons — the proper natural=water
                 // polygon/multipolygon defines the actual riverbanks at full resolution.
                 else if (t.landuse === 'grass' || t.landuse === 'meadow' || t.landuse === 'village_green' || t.landuse === 'flowerbed' || t.landuse === 'forest') {
-                    addPolygon(group, el, nodeIndex, tileX, tileY, Z_GROUND, matGrass);
+                    addPolygon(buckets, el, nodeIndex, tileX, tileY, Z_GROUND, matGrass);
                 } else if (t.leisure === 'park') {
-                    addPolygon(group, el, nodeIndex, tileX, tileY, Z_GROUND, matPark);
+                    addPolygon(buckets, el, nodeIndex, tileX, tileY, Z_GROUND, matPark);
                 } else if (t.leisure === 'garden') {
-                    addPolygon(group, el, nodeIndex, tileX, tileY, Z_GROUND, matGarden);
+                    addPolygon(buckets, el, nodeIndex, tileX, tileY, Z_GROUND, matGarden);
                 } else if (t.leisure === 'pitch') {
-                    addPolygon(group, el, nodeIndex, tileX, tileY, Z_GROUND, matPitch);
+                    addPolygon(buckets, el, nodeIndex, tileX, tileY, Z_GROUND, matPitch);
                 } else if (t.barrier === 'wall' || t.barrier === 'fence' || t.barrier === 'hedge') {
                     const nodes = resolveWay(el, nodeIndex);
                     if (nodes && nodes.length >= 2) {
                         const pts = projectNodes(nodes, tileX, tileY);
-                        const m = buildRibbon(pts, 0.3, 0, t.barrier === 'hedge' ? 1.5 : 1.8, matBarrier);
-                        if (m) group.add(m);
+                        const g = buildRibbonGeo(pts, 0.3, 0, t.barrier === 'hedge' ? 1.5 : 1.8);
+                        if (g) pushGeo(buckets, matBarrier, g);
                     }
                 }
             } else if (el.type === 'node') {
@@ -607,16 +624,26 @@ export async function loadOSMTile(scene, tileX, tileY, signal) {
                 else if (t.highway === 'street_lamp') lampNodes.push(el);
             } else if (el.type === 'relation') {
                 if (t.natural === 'water' || t.water || t.waterway) {
-                    addMultipolygon(group, el, wayIndex, nodeIndex, tileX, tileY, Z_WATER, matWater);
+                    addMultipolygon(buckets, el, wayIndex, nodeIndex, tileX, tileY, Z_WATER, matWater);
                 } else if (t.landuse === 'grass' || t.landuse === 'meadow' || t.landuse === 'village_green' || t.landuse === 'forest') {
-                    addMultipolygon(group, el, wayIndex, nodeIndex, tileX, tileY, Z_GROUND, matGrass);
+                    addMultipolygon(buckets, el, wayIndex, nodeIndex, tileX, tileY, Z_GROUND, matGrass);
                 } else if (t.leisure === 'park') {
-                    addMultipolygon(group, el, wayIndex, nodeIndex, tileX, tileY, Z_GROUND, matPark);
+                    addMultipolygon(buckets, el, wayIndex, nodeIndex, tileX, tileY, Z_GROUND, matPark);
                 }
             }
         } catch (e) {
             // skip malformed feature
         }
+    }
+
+    // Merge each material's geometries into a single mesh → ~1 draw call per material.
+    // Then add one LineSegments of edges per merged mesh (cheap because only one per material).
+    for (const [material, geos] of buckets) {
+        if (geos.length === 0) continue;
+        const merged = mergeGeometries(geos, false);
+        if (!merged) continue;
+        group.add(new THREE.Mesh(merged, material));
+        group.add(new THREE.LineSegments(new THREE.EdgesGeometry(merged, 30), matEdge));
     }
 
     addTreesInstanced(group, treeNodes, tileX, tileY);
