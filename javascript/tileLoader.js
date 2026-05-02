@@ -5,6 +5,9 @@ import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 const USE_ONLINE_DATA = true;
 const ONLINE_DATA_BASE = 'https://storage.googleapis.com/fly-over-ghent/';
 
+// Single-tile debug mode: when set, only this one tile is ever loaded
+const SINGLE_TILE_KEY = null;
+
 // Tile system constants
 const TILE_SIZE = 1000;
 const VIEW_DISTANCE = 2; // tiles in each direction (2 = 5x5 grid)
@@ -28,7 +31,7 @@ const loader = new STLLoader();
 const buildingMaterial = new THREE.MeshLambertMaterial({
     color: 0xffffff,
     flatShading: true,
-    side: THREE.DoubleSide,
+    side: THREE.FrontSide,
     depthTest: true,
     depthWrite: true
 });
@@ -36,7 +39,7 @@ const buildingMaterial = new THREE.MeshLambertMaterial({
 const terrainMaterial = new THREE.MeshLambertMaterial({
     color: 0xffffff,
     flatShading: false,
-    side: THREE.DoubleSide,
+    side: THREE.FrontSide,
     depthTest: true,
     depthWrite: true
 });
@@ -220,20 +223,22 @@ export function updateChunks(scene, cameraPosition, cameraDirection) {
     lastDirX = dirX;
     lastDirY = dirY;
 
-    const desired = new Set();
-    for (let dx = -VIEW_DISTANCE; dx <= VIEW_DISTANCE; dx++) {
-        for (let dy = -VIEW_DISTANCE; dy <= VIEW_DISTANCE; dy++) {
-            // Always keep the tile we're standing on
-            if (dx === 0 && dy === 0) {
-                desired.add(`${cameraTile.x}_${cameraTile.y}`);
-                continue;
-            }
-            // Dot product between camera direction and tile offset
-            const dot = dx * dirX + dy * dirY;
-            if (dot >= -0.3) { // generous ~110° half-angle in front
-                const tx = cameraTile.x + dx * TILE_SIZE;
-                const ty = cameraTile.y + dy * TILE_SIZE;
-                desired.add(`${tx}_${ty}`);
+    const desired = SINGLE_TILE_KEY ? new Set([SINGLE_TILE_KEY]) : new Set();
+    if (!SINGLE_TILE_KEY) {
+        for (let dx = -VIEW_DISTANCE; dx <= VIEW_DISTANCE; dx++) {
+            for (let dy = -VIEW_DISTANCE; dy <= VIEW_DISTANCE; dy++) {
+                // Always keep the tile we're standing on
+                if (dx === 0 && dy === 0) {
+                    desired.add(`${cameraTile.x}_${cameraTile.y}`);
+                    continue;
+                }
+                // Dot product between camera direction and tile offset
+                const dot = dx * dirX + dy * dirY;
+                if (dot >= -0.3) { // generous ~110° half-angle in front
+                    const tx = cameraTile.x + dx * TILE_SIZE;
+                    const ty = cameraTile.y + dy * TILE_SIZE;
+                    desired.add(`${tx}_${ty}`);
+                }
             }
         }
     }

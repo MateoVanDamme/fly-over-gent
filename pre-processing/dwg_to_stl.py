@@ -130,6 +130,37 @@ def extract_edges(stl_path, edge_path, angle_threshold=10):
     print(f"  -> {edge_path.name} ({size_kb:.0f} KB, {len(sharp):,} edges)")
 
 
+def _orient_outward(mesh):
+    """Orient face normals outward (away from each connected component's interior).
+
+    Source DXF entities have unreliable winding: 3DFACE faces are individually
+    inconsistent, and POLYLINE poly-face-mesh is consistent but inward. Both
+    are handled by: merge by position, propagate a consistent winding through
+    each component, then flip components whose topmost face points down (roofs
+    must be up). Components without a clear up/down face (purely vertical) are
+    left as fix_winding put them.
+    """
+    mesh.merge_vertices()
+    trimesh.repair.fix_winding(mesh)
+    cc = trimesh.graph.connected_components(mesh.face_adjacency, min_len=1)
+    flips = np.zeros(len(mesh.faces), dtype=bool)
+    for face_idx in cc:
+        if len(face_idx) == 0:
+            continue
+        fn = mesh.face_normals[face_idx]
+        if np.abs(fn[:, 2]).max() < 0.3:
+            continue
+        tc = mesh.triangles_center[face_idx]
+        score = tc[:, 2] + 5.0 * np.abs(fn[:, 2])
+        best = face_idx[int(score.argmax())]
+        if mesh.face_normals[best][2] < 0:
+            flips[face_idx] = True
+    if flips.any():
+        new_faces = mesh.faces.copy()
+        new_faces[flips] = new_faces[flips][:, ::-1]
+        mesh.faces = new_faces
+
+
 def dxf_to_stl(dxf_path, stl_path):
     """Convert DXF file to STL."""
     dxf_path = Path(dxf_path)
@@ -192,6 +223,7 @@ def dxf_to_stl(dxf_path, stl_path):
         faces[i] = (base, base + 1, base + 2)
 
     mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
+    _orient_outward(mesh)
     mesh.export(str(stl_path))
 
     size_mb = stl_path.stat().st_size / (1024 * 1024)
