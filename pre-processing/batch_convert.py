@@ -45,38 +45,25 @@ def convert_dxf_to_stl(args: Tuple[str, str]) -> Tuple[str, bool, str]:
         return (os.path.basename(dxf_file), False, str(e))
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Batch convert DWG files to STL (two-phase: DWG->DXF cached, DXF->STL parallel)",
-    )
-    parser.add_argument('directory', help='Directory containing DWG files')
-    parser.add_argument('--pattern', default='*.dwg', help='File pattern (default: *.dwg)')
-    parser.add_argument('--skip-existing', action='store_true', help='Skip files that already have STL outputs')
-    parser.add_argument('--workers', type=int, default=None, help='Parallel workers for DXF->STL (default: CPU count - 1)')
-    parser.add_argument('--output', default=None, help='Output directory for STL files')
-    parser.add_argument('--dxf-cache', default=None, help=f'DXF cache directory (default: {DXF_CACHE_DIR})')
+def batch_convert(directory, pattern='*.dwg', skip_existing=False,
+                  workers=None, verbose=False, output_dir=None, dxf_cache=None):
+    """Run the DWG -> DXF -> STL pipeline over every matching DWG in `directory`.
 
-    args = parser.parse_args()
+    Returns (successful_count, failed_list). `failed_list` is [(name, error), ...].
+    """
+    if not os.path.isdir(directory):
+        raise FileNotFoundError(f"Directory not found: {directory}")
 
-    if not os.path.isdir(args.directory):
-        print(f"Error: Directory not found: {args.directory}")
-        sys.exit(1)
-
-    output_dir = args.output
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
+    cache_dir = Path(dxf_cache) if dxf_cache else DXF_CACHE_DIR
 
-    cache_dir = Path(args.dxf_cache) if args.dxf_cache else DXF_CACHE_DIR
-
-    # Find all DWG files
-    dwg_files = find_cad_files(args.directory, args.pattern)
+    dwg_files = find_cad_files(directory, pattern)
     print(f"Found {len(dwg_files)} DWG files")
-
     if not dwg_files:
-        return
+        return 0, []
 
-    # Filter out files that already have STL outputs
-    if args.skip_existing:
+    if skip_existing:
         original_count = len(dwg_files)
         filtered = []
         for f in dwg_files:
@@ -91,13 +78,12 @@ def main():
 
     if not dwg_files:
         print("All files already converted!")
-        return
+        return 0, []
 
     # Phase 1: DWG -> DXF (sequential, cached)
     print(f"\n--- Phase 1: DWG -> DXF ({len(dwg_files)} files) ---")
     dxf_files = []
     start_time = time.time()
-
     for i, dwg_file in enumerate(dwg_files, 1):
         name = os.path.basename(dwg_file)
         dxf_path = cache_dir / Path(dwg_file).with_suffix('.dxf').name
@@ -106,19 +92,17 @@ def main():
             dxf = dwg_to_dxf(dwg_file, cache_dir)
             status = "CACHED" if cached else "OK"
             dxf_files.append((dwg_file, str(dxf)))
-        except Exception as e:
+        except Exception:
             status = "FAIL"
             dxf_files.append((dwg_file, None))
         print(f"[{i}/{len(dwg_files)}] {status} {name}")
-
     phase1_time = time.time() - start_time
     valid = [(dwg, dxf) for dwg, dxf in dxf_files if dxf is not None]
     print(f"Phase 1 done: {len(valid)}/{len(dwg_files)} converted in {phase1_time:.1f}s")
 
     # Phase 2: DXF -> STL (parallel)
-    workers = args.workers or max(1, cpu_count() - 1)
+    workers = workers or max(1, cpu_count() - 1)
     print(f"\n--- Phase 2: DXF -> STL ({len(valid)} files, {workers} workers) ---")
-
     stl_args = []
     for dwg_file, dxf_file in valid:
         stl_name = get_output_filename(dwg_file)
@@ -128,7 +112,6 @@ def main():
     start_time = time.time()
     successful = 0
     failed = []
-
     with Pool(processes=workers) as pool:
         for i, (name, ok, error) in enumerate(pool.imap_unordered(convert_dxf_to_stl, stl_args), 1):
             if ok:
@@ -137,7 +120,6 @@ def main():
             else:
                 failed.append((name, error))
                 print(f"[{i}/{len(stl_args)}] FAIL {name}: {error}")
-
     phase2_time = time.time() - start_time
 
     print(f"\n{'='*60}")
@@ -145,12 +127,33 @@ def main():
     print(f"Phase 1 (DWG->DXF): {phase1_time:.1f}s")
     print(f"Phase 2 (DXF->STL): {phase2_time:.1f}s")
     print(f"{'='*60}")
-
     if failed:
         print("\nFailed files:")
         for name, error in failed:
             print(f"  {name}: {error}")
+    return successful, failed
 
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Batch convert DWG files to STL (two-phase: DWG->DXF cached, DXF->STL parallel)",
+    )
+    parser.add_argument('directory', help='Directory containing DWG files')
+    parser.add_argument('--pattern', default='*.dwg', help='File pattern (default: *.dwg)')
+    parser.add_argument('--skip-existing', action='store_true', help='Skip files that already have STL outputs')
+    parser.add_argument('--workers', type=int, default=None, help='Parallel workers for DXF->STL (default: CPU count - 1)')
+    parser.add_argument('--output', default=None, help='Output directory for STL files')
+    parser.add_argument('--dxf-cache', default=None, help=f'DXF cache directory (default: {DXF_CACHE_DIR})')
+    args = parser.parse_args()
+
+    _, failed = batch_convert(
+        directory=args.directory,
+        pattern=args.pattern,
+        skip_existing=args.skip_existing,
+        workers=args.workers,
+        output_dir=args.output,
+        dxf_cache=args.dxf_cache,
+    )
     sys.exit(0 if not failed else 1)
 
 

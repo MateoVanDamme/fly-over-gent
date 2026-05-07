@@ -28,6 +28,8 @@
             <kbd>Mouse</kbd><span>Look around</span>
             <kbd>I</kbd><span>Toggle UI</span>
         </div>
+        <h3 style="margin-top: 10px;">Tools</h3>
+        <a href="https://print-gent.mateovandamme.com/" style="color:#ffaa55;">Crop a printable STL →</a>
     </div>
 
     <script type="importmap">
@@ -42,7 +44,18 @@
 
     <script>
         if ('serviceWorker' in navigator) {
+            // Track whether this page started with a controlling SW. If so,
+            // a controllerchange means a new SW just took over (e.g. after
+            // the cache name bumped) — reload once so the page picks up the
+            // fresh tiles instead of showing the old cached ones.
+            const hadController = !!navigator.serviceWorker.controller;
             navigator.serviceWorker.register('sw.js');
+            let refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (refreshing || !hadController) return;
+                refreshing = true;
+                location.reload();
+            });
         }
     </script>
     <script type="module" src="main.js"></script>

@@ -1,8 +1,14 @@
-const CACHE_NAME = 'fly-over-ghent-tiles';
+// Bump this whenever the STL contents on GCS change. Old caches are deleted
+// on activate so existing visitors don't keep serving stale tiles.
+const CACHE_NAME = 'fly-over-ghent-tiles-v2';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => {
-    event.waitUntil(self.clients.claim());
+    event.waitUntil((async () => {
+        const names = await caches.keys();
+        await Promise.all(names.filter(n => n !== CACHE_NAME).map(n => caches.delete(n)));
+        await self.clients.claim();
+    })());
 });
 
 self.addEventListener('fetch', (event) => {

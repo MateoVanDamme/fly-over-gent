@@ -169,21 +169,22 @@ def dxf_to_stl(dxf_path, stl_path):
     doc = ezdxf.readfile(str(dxf_path))
     msp = doc.modelspace()
 
-    # Flatten all block references and extract geometry
+    # 3DFACE and POLYFACE_MESH both encode a triangle as a 4-corner face
+    # where the 4th vertex equals the 3rd (per the AutoCAD spec). We detect
+    # that at the source instead of producing a degenerate triangle and
+    # filtering it out later.
     all_triangles = []
     for entity in recursive_decompose(msp):
         etype = entity.dxftype()
 
         if etype == '3DFACE':
-            pts = [(entity.dxf.vtx0.x, entity.dxf.vtx0.y, entity.dxf.vtx0.z),
-                   (entity.dxf.vtx1.x, entity.dxf.vtx1.y, entity.dxf.vtx1.z),
-                   (entity.dxf.vtx2.x, entity.dxf.vtx2.y, entity.dxf.vtx2.z),
-                   (entity.dxf.vtx3.x, entity.dxf.vtx3.y, entity.dxf.vtx3.z)]
-            if abs(pts[2][0]-pts[3][0]) < 0.001 and abs(pts[2][1]-pts[3][1]) < 0.001:
-                all_triangles.append(pts[:3])
-            else:
-                all_triangles.append(pts[:3])
-                all_triangles.append([pts[0], pts[2], pts[3]])
+            v0 = (entity.dxf.vtx0.x, entity.dxf.vtx0.y, entity.dxf.vtx0.z)
+            v1 = (entity.dxf.vtx1.x, entity.dxf.vtx1.y, entity.dxf.vtx1.z)
+            v2 = (entity.dxf.vtx2.x, entity.dxf.vtx2.y, entity.dxf.vtx2.z)
+            v3 = (entity.dxf.vtx3.x, entity.dxf.vtx3.y, entity.dxf.vtx3.z)
+            all_triangles.append([v0, v1, v2])
+            if v3 != v2:  # genuine quad
+                all_triangles.append([v0, v2, v3])
 
         elif etype == 'POLYLINE' and entity.is_poly_face_mesh:
             vertex_list = list(entity.vertices)
@@ -195,18 +196,23 @@ def dxf_to_stl(dxf_path, stl_path):
             for v in vertex_list:
                 if getattr(v.dxf, 'vtx0', None) is None:
                     continue
-                face_pts = []
+                # Collect indices, dropping zeros (unused) and any that
+                # repeat (triangle encoded as quad).
+                indices = []
                 for attr in ('vtx0', 'vtx1', 'vtx2', 'vtx3'):
                     idx = getattr(v.dxf, attr, None)
-                    if idx is not None and idx != 0:
-                        actual_idx = abs(idx) - 1
-                        if actual_idx in coords:
-                            face_pts.append(coords[actual_idx])
-                if len(face_pts) == 3:
-                    all_triangles.append(face_pts)
-                elif len(face_pts) >= 4:
-                    all_triangles.append(face_pts[:3])
-                    all_triangles.append([face_pts[0], face_pts[2], face_pts[3]])
+                    if idx is None or idx == 0:
+                        continue
+                    actual = abs(idx) - 1
+                    if actual in indices or actual not in coords:
+                        continue
+                    indices.append(actual)
+                if len(indices) == 3:
+                    all_triangles.append([coords[i] for i in indices])
+                elif len(indices) >= 4:
+                    p = [coords[i] for i in indices]
+                    all_triangles.append([p[0], p[1], p[2]])
+                    all_triangles.append([p[0], p[2], p[3]])
 
     if not all_triangles:
         raise RuntimeError("No valid 3D geometry found!")
@@ -224,10 +230,13 @@ def dxf_to_stl(dxf_path, stl_path):
 
     mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
     _orient_outward(mesh)
+    # Backstop: drop any near-zero-area triangles that survived dedup.
+    mesh.update_faces(mesh.nondegenerate_faces(height=1e-9))
+    mesh.remove_unreferenced_vertices()
     mesh.export(str(stl_path))
 
     size_mb = stl_path.stat().st_size / (1024 * 1024)
-    print(f"  -> {stl_path.name} ({size_mb:.1f} MB, {n:,} faces)")
+    print(f"  -> {stl_path.name} ({size_mb:.1f} MB, {len(mesh.faces):,} faces, {n - len(mesh.faces):,} dropped)")
 
     # Extract precomputed edges
     if stl_path.name.startswith('Geb_'):
