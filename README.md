@@ -2,6 +2,8 @@
 
 Interactive 3D viewer for flying through the city of Ghent using real city data.
 
+**Live demo:** https://fly.mateovandamme.com/ — sister project: [print-ghent](https://print-gent.mateovandamme.com/) for cropping printable STLs of any region.
+
 ## Features
 
 - **Free Flight** — Fly freely through the 3D city with WASD + mouse controls
