@@ -20,6 +20,21 @@ export const loadedTiles = new Map();
 export const loadingTiles = new Map();
 // Cache of tiles removed from scene but kept in memory: key "x_y" → THREE.Group
 export const tileCache = new Map();
+
+// Edge visibility toggle, applied to every loaded tile and any future load
+let edgesVisible = true;
+
+function applyEdgeVisibility(group) {
+    for (const child of group.children) {
+        if (child.isLineSegments) child.visible = edgesVisible;
+    }
+}
+
+export function setEdgesVisible(visible) {
+    edgesVisible = visible;
+    for (const group of loadedTiles.values()) applyEdgeVisibility(group);
+    for (const group of tileCache.values()) applyEdgeVisibility(group);
+}
 // Cache last state to skip redundant updateChunks calls
 let lastCameraTileKey = '';
 let lastDirX = 0;
@@ -180,6 +195,7 @@ async function loadTile(scene, tileX, tileY) {
     }
 
     if (hasContent) {
+        applyEdgeVisibility(group);
         scene.add(group);
         loadedTiles.set(key, group);
     }
@@ -227,16 +243,19 @@ export function updateChunks(scene, cameraPosition, cameraDirection) {
     if (!SINGLE_TILE_KEY) {
         for (let dx = -VIEW_DISTANCE; dx <= VIEW_DISTANCE; dx++) {
             for (let dy = -VIEW_DISTANCE; dy <= VIEW_DISTANCE; dy++) {
-                // Always keep the tile we're standing on
-                if (dx === 0 && dy === 0) {
-                    desired.add(`${cameraTile.x}_${cameraTile.y}`);
+                const tx = cameraTile.x + dx * TILE_SIZE;
+                const ty = cameraTile.y + dy * TILE_SIZE;
+
+                // Always keep the 3x3 around us; too close to be worth filtering
+                // by direction (a tile one offset behind can still be half in view).
+                if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
+                    desired.add(`${tx}_${ty}`);
                     continue;
                 }
-                // Dot product between camera direction and tile offset
+
+                // Direction filter for the outer ring only.
                 const dot = dx * dirX + dy * dirY;
                 if (dot >= -0.3) { // generous ~110° half-angle in front
-                    const tx = cameraTile.x + dx * TILE_SIZE;
-                    const ty = cameraTile.y + dy * TILE_SIZE;
                     desired.add(`${tx}_${ty}`);
                 }
             }

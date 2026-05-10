@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import Stats from 'three/addons/libs/stats.module.js';
-import { updateChunks, getCameraTile } from './javascript/tileLoader.js';
+import { updateChunks, getCameraTile, setEdgesVisible } from './javascript/tileLoader.js';
 import { updateMinimap } from './javascript/minimap.js';
 
 let camera, scene, renderer, stats;
@@ -71,6 +71,14 @@ function init() {
         if (event.code === 'KeyI') {
             debugVisible = !debugVisible;
             toggleDebugInfo();
+        }
+    });
+
+    let edgesVisible = true;
+    document.addEventListener('keydown', (event) => {
+        if (event.code === 'KeyE') {
+            edgesVisible = !edgesVisible;
+            setEdgesVisible(edgesVisible);
         }
     });
 
